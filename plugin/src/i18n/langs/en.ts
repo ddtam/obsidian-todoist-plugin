@@ -271,15 +271,6 @@ export const en: Translations = {
         "Both 'due' and 'time' show options are set. The 'time' option will be ignored when 'due' is present.",
       projectAndSection:
         "Both 'project' and 'section' show options are set. The 'section' option will be ignored when 'project' is present.",
-      completedAutorefreshTooFast:
-        "autorefresh below 10s is not recommended for completed-task queries due to API rate limits.",
-      completedOnlyFilterCaveat:
-        "filter expressions may not apply to completed tasks; results may differ from active queries.",
-    },
-    error: {
-      completedRequiresMode: (key: string) =>
-        `'${key}' requires 'completed' to be 'include' or 'only'.`,
-      completedUntilBeforeSince: "'completedUntil' must be the same as or after 'completedSince'.",
     },
     groupedHeaders: {
       noDueDate: "No due date",

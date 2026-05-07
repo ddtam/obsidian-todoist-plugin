@@ -11,21 +11,6 @@ import { type RequestParams, StatusCode, type WebFetcher, type WebResponse } fro
 import { parseApiResponse } from "@/api/validation";
 import { debug } from "@/log";
 
-export type CompletedTasksMode = "byCompletionDate" | "byDueDate";
-
-export type GetCompletedTasksParams = {
-  mode: CompletedTasksMode;
-  since?: string;
-  until?: string;
-  limit?: number;
-};
-
-const normalizeIsoDateTime = (value: string): string => {
-  // Todoist's completed-task endpoints expect RFC3339 datetimes. If the user
-  // supplied a bare ISO date (YYYY-MM-DD), promote it to start-of-day UTC.
-  return value.includes("T") ? value : `${value}T00:00:00Z`;
-};
-
 export class TodoistApiClient {
   private readonly token: string;
   private readonly fetcher: WebFetcher;
@@ -41,29 +26,6 @@ export class TodoistApiClient {
     }
 
     return await this.doPaginated("/tasks", taskSchema);
-  }
-
-  public async getCompletedTasks(params: GetCompletedTasksParams): Promise<Task[]> {
-    const path =
-      params.mode === "byDueDate"
-        ? "/tasks/completed/by_due_date"
-        : "/tasks/completed/by_completion_date";
-
-    const queryParams: Record<string, string> = {};
-    if (params.since !== undefined) {
-      queryParams.since = normalizeIsoDateTime(params.since);
-    }
-    if (params.until !== undefined) {
-      queryParams.until = normalizeIsoDateTime(params.until);
-    }
-    if (params.limit !== undefined) {
-      queryParams.limit = String(params.limit);
-    }
-
-    return await this.doPaginated(path, taskSchema, queryParams, {
-      wrapperField: "items",
-      maxItems: params.limit,
-    });
   }
 
   public async getTaskById(id: TaskId): Promise<Task> {
@@ -102,19 +64,14 @@ export class TodoistApiClient {
     path: string,
     schema: z.ZodType<T>,
     params?: Record<string, string>,
-    opts?: { wrapperField?: "results" | "items"; maxItems?: number },
   ): Promise<T[]> {
-    const wrapperField = opts?.wrapperField ?? "results";
-    const maxItems = opts?.maxItems;
-
     const allResults: T[] = [];
     let cursor: string | null | undefined = null;
 
     const paginatedSchema = z.object({
-      [wrapperField]: z.array(schema),
-      // The completed-tasks endpoints OMIT next_cursor entirely on the
-      // last page (rather than returning null). Use nullish to accept
-      // missing, null, or string.
+      results: z.array(schema),
+      // Defensive: some endpoints omit next_cursor entirely on the last
+      // page rather than returning null. Accept missing, null, or string.
       nextCursor: z.string().nullish(),
     });
 
@@ -128,16 +85,10 @@ export class TodoistApiClient {
       }
 
       const response = await this.do(path, "GET", { queryParams });
-      const paginatedResponse = parseApiResponse(paginatedSchema, response.body) as {
-        nextCursor?: string | null;
-      } & Record<string, T[]>;
+      const paginatedResponse = parseApiResponse(paginatedSchema, response.body);
 
-      allResults.push(...paginatedResponse[wrapperField]);
+      allResults.push(...paginatedResponse.results);
       cursor = paginatedResponse.nextCursor;
-
-      if (maxItems !== undefined && allResults.length >= maxItems) {
-        return allResults.slice(0, maxItems);
-      }
     } while (cursor);
 
     return allResults;

@@ -123,84 +123,6 @@ describe("parseQuery - rejections", () => {
         view: { hideNoTasks: "true" },
       },
     },
-    {
-      description: "completed must be a valid enum value",
-      input: {
-        filter: "bar",
-        completed: "sometimes",
-      },
-    },
-    {
-      description: "completedSince must match ISO date / RFC3339 format",
-      input: {
-        filter: "bar",
-        completed: "only",
-        completedSince: "yesterday",
-      },
-    },
-    {
-      description: "completedUntil must match ISO date / RFC3339 format",
-      input: {
-        filter: "bar",
-        completed: "only",
-        completedUntil: "04/01/2026",
-      },
-    },
-    {
-      description: "completedLimit must be an integer",
-      input: {
-        filter: "bar",
-        completed: "only",
-        completedLimit: 12.5,
-      },
-    },
-    {
-      description: "completedLimit must be at least 1",
-      input: {
-        filter: "bar",
-        completed: "only",
-        completedLimit: 0,
-      },
-    },
-    {
-      description: "completedLimit must not exceed 200",
-      input: {
-        filter: "bar",
-        completed: "only",
-        completedLimit: 500,
-      },
-    },
-    {
-      description: "completedSince requires completed mode != exclude",
-      input: {
-        filter: "bar",
-        completedSince: "2026-04-01",
-      },
-    },
-    {
-      description: "completedUntil requires completed mode != exclude",
-      input: {
-        filter: "bar",
-        completed: "exclude",
-        completedUntil: "2026-04-01",
-      },
-    },
-    {
-      description: "completedLimit requires completed mode != exclude",
-      input: {
-        filter: "bar",
-        completedLimit: 50,
-      },
-    },
-    {
-      description: "completedSince must not be after completedUntil",
-      input: {
-        filter: "bar",
-        completed: "only",
-        completedSince: "2026-05-01",
-        completedUntil: "2026-04-01",
-      },
-    },
   ];
 
   for (const tc of testcases) {
@@ -383,97 +305,6 @@ describe("parseQuery", () => {
         view: { hideNoTasks: true },
       }),
     },
-    {
-      description: "with completed = exclude",
-      input: {
-        filter: "bar",
-        completed: "exclude",
-      },
-      expectedOutput: makeQuery({
-        filter: "bar",
-        completed: "exclude",
-      }),
-    },
-    {
-      description: "with completed = include",
-      input: {
-        filter: "bar",
-        completed: "include",
-      },
-      expectedOutput: makeQuery({
-        filter: "bar",
-        completed: "include",
-      }),
-    },
-    {
-      description: "with completed = only",
-      input: {
-        filter: "",
-        completed: "only",
-      },
-      expectedOutput: makeQuery({
-        filter: "",
-        completed: "only",
-      }),
-    },
-    {
-      description: "with completed = only and ISO date range",
-      input: {
-        filter: "",
-        completed: "only",
-        completedSince: "2026-04-01",
-        completedUntil: "2026-05-06",
-      },
-      expectedOutput: makeQuery({
-        filter: "",
-        completed: "only",
-        completedSince: "2026-04-01",
-        completedUntil: "2026-05-06",
-      }),
-    },
-    {
-      description: "with completed = only and RFC3339 datetime range",
-      input: {
-        filter: "",
-        completed: "only",
-        completedSince: "2026-04-01T00:00:00Z",
-        completedUntil: "2026-05-06T23:59:59+02:00",
-      },
-      expectedOutput: makeQuery({
-        filter: "",
-        completed: "only",
-        completedSince: "2026-04-01T00:00:00Z",
-        completedUntil: "2026-05-06T23:59:59+02:00",
-      }),
-    },
-    {
-      description: "with completed = include and completedLimit",
-      input: {
-        filter: "bar",
-        completed: "include",
-        completedLimit: 50,
-      },
-      expectedOutput: makeQuery({
-        filter: "bar",
-        completed: "include",
-        completedLimit: 50,
-      }),
-    },
-    {
-      description: "with completedSince = completedUntil (boundary)",
-      input: {
-        filter: "",
-        completed: "only",
-        completedSince: "2026-04-01",
-        completedUntil: "2026-04-01",
-      },
-      expectedOutput: makeQuery({
-        filter: "",
-        completed: "only",
-        completedSince: "2026-04-01",
-        completedUntil: "2026-04-01",
-      }),
-    },
   ];
 
   for (const tc of testcases) {
@@ -546,63 +377,6 @@ describe("parseQuery - warnings", () => {
         "Found unexpected query key 'view.unknownProp'. Is this a typo?",
       ],
     },
-    {
-      description: "completed = include with autorefresh below 10s",
-      input: {
-        filter: "bar",
-        completed: "include",
-        autorefresh: 5,
-      },
-      expectedWarnings: [
-        "This query is written using JSON. This is deprecated and will be removed in a future version. Please use YAML instead.",
-        "autorefresh below 10s is not recommended for completed-task queries due to API rate limits.",
-      ],
-    },
-    {
-      description: "completed = only with autorefresh below 10s",
-      input: {
-        filter: "",
-        completed: "only",
-        autorefresh: 5,
-      },
-      expectedWarnings: [
-        "This query is written using JSON. This is deprecated and will be removed in a future version. Please use YAML instead.",
-        "autorefresh below 10s is not recommended for completed-task queries due to API rate limits.",
-      ],
-    },
-    {
-      description: "completed = only with non-empty filter emits caveat",
-      input: {
-        filter: "today",
-        completed: "only",
-      },
-      expectedWarnings: [
-        "This query is written using JSON. This is deprecated and will be removed in a future version. Please use YAML instead.",
-        "filter expressions may not apply to completed tasks; results may differ from active queries.",
-      ],
-    },
-    {
-      description: "completed = exclude with low autorefresh emits no completed warning",
-      input: {
-        filter: "bar",
-        completed: "exclude",
-        autorefresh: 5,
-      },
-      expectedWarnings: [
-        "This query is written using JSON. This is deprecated and will be removed in a future version. Please use YAML instead.",
-      ],
-    },
-    {
-      description:
-        "completed = include with non-empty filter emits no caveat (caveat is only for 'only')",
-      input: {
-        filter: "today",
-        completed: "include",
-      },
-      expectedWarnings: [
-        "This query is written using JSON. This is deprecated and will be removed in a future version. Please use YAML instead.",
-      ],
-    },
   ];
 
   for (const tc of testcases) {
@@ -611,47 +385,6 @@ describe("parseQuery - warnings", () => {
       expect(warnings).toStrictEqual(tc.expectedWarnings);
     });
   }
-});
-
-describe("parseQuery - YAML date coercion", () => {
-  // YAML auto-parses unquoted date literals into Date objects. Verify that
-  // bare dates work in the completed-tasks fields without requiring users
-  // to quote them.
-  it("accepts unquoted YAML dates for completedSince/completedUntil", () => {
-    const yaml = [
-      'filter: ""',
-      "completed: only",
-      "completedSince: 2026-04-01",
-      "completedUntil: 2026-05-06",
-    ].join("\n");
-
-    const [output] = parseQuery(yaml, taskQueryDefinition);
-    expect(output.completed).toBe("only");
-    expect(output.completedSince).toMatch(/^2026-04-01T00:00:00(\.\d+)?Z$/);
-    expect(output.completedUntil).toMatch(/^2026-05-06T00:00:00(\.\d+)?Z$/);
-  });
-
-  it("accepts quoted YAML dates as plain strings", () => {
-    const yaml = [
-      'filter: ""',
-      "completed: only",
-      'completedSince: "2026-04-01"',
-      'completedUntil: "2026-05-06"',
-    ].join("\n");
-
-    const [output] = parseQuery(yaml, taskQueryDefinition);
-    expect(output.completedSince).toBe("2026-04-01");
-    expect(output.completedUntil).toBe("2026-05-06");
-  });
-
-  it("accepts unquoted YAML datetimes (RFC3339)", () => {
-    const yaml = ['filter: ""', "completed: only", "completedSince: 2026-04-01T12:00:00Z"].join(
-      "\n",
-    );
-
-    const [output] = parseQuery(yaml, taskQueryDefinition);
-    expect(output.completedSince).toMatch(/^2026-04-01T12:00:00(\.\d+)?Z$/);
-  });
 });
 
 describe("parseQuery - error message snapshots", () => {
@@ -736,27 +469,6 @@ describe("parseQuery - error message snapshots", () => {
     {
       description: "array with mixed valid and invalid enum values",
       input: '{"filter": "bar", "sorting": ["date", "invalid", "priority"]}',
-    },
-    {
-      description: "completed must be a valid enum value",
-      input: '{"filter": "bar", "completed": "sometimes"}',
-    },
-    {
-      description: "completedSince has invalid date format",
-      input: '{"filter": "bar", "completed": "only", "completedSince": "yesterday"}',
-    },
-    {
-      description: "completedLimit exceeds maximum",
-      input: '{"filter": "bar", "completed": "only", "completedLimit": 500}',
-    },
-    {
-      description: "completedSince without completed mode",
-      input: '{"filter": "bar", "completedSince": "2026-04-01"}',
-    },
-    {
-      description: "completedSince after completedUntil",
-      input:
-        '{"filter": "bar", "completed": "only", "completedSince": "2026-05-01", "completedUntil": "2026-04-01"}',
     },
   ];
 

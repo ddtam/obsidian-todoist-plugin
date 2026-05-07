@@ -140,39 +140,9 @@ export class TodoistAdapter {
       if (!this.api.hasValue()) {
         return undefined;
       }
-      const mode = query.completed ?? "exclude";
-
-      if (mode === "exclude") {
-        return await this.fetchActive(query);
-      }
-
-      if (mode === "only") {
-        return await this.fetchCompleted(query);
-      }
-
-      const [active, completed] = await Promise.all([
-        this.fetchActive(query),
-        this.fetchCompleted(query),
-      ]);
-      return [...active, ...completed];
+      const data = await this.api.withInner((api) => api.getTasks(query.filter));
+      return data.map((t) => hydrate(t, this.data()));
     };
-  }
-
-  private async fetchActive(query: TaskQuery): Promise<Task[]> {
-    const data = await this.api.withInner((api) => api.getTasks(query.filter));
-    return data.map((t) => hydrate(t, this.data()));
-  }
-
-  private async fetchCompleted(query: TaskQuery): Promise<Task[]> {
-    const data = await this.api.withInner((api) =>
-      api.getCompletedTasks({
-        mode: "byCompletionDate",
-        since: query.completedSince,
-        until: query.completedUntil,
-        limit: query.completedLimit,
-      }),
-    );
-    return data.map((t) => hydrate(t, this.data()));
   }
 
   private async closeTask(id: TaskId): Promise<void> {

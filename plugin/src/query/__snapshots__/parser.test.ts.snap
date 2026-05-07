@@ -15,31 +15,6 @@ exports[`parseQuery - error message snapshots > autorefresh must be non-negative
   Too small: expected number to be >=0]
 `;
 
-exports[`parseQuery - error message snapshots > completed must be a valid enum value 1`] = `
-[Error: Field 'completed' has the following issues:
-  Invalid option: expected one of "exclude"|"include"|"only"]
-`;
-
-exports[`parseQuery - error message snapshots > completedLimit exceeds maximum 1`] = `
-[Error: Field 'completedLimit' has the following issues:
-  Too big: expected number to be <=200]
-`;
-
-exports[`parseQuery - error message snapshots > completedSince after completedUntil 1`] = `
-[Error: Field 'completedUntil' has the following issues:
-  'completedUntil' must be the same as or after 'completedSince'.]
-`;
-
-exports[`parseQuery - error message snapshots > completedSince has invalid date format 1`] = `
-[Error: Field 'completedSince' has the following issues:
-  must be an ISO date (YYYY-MM-DD) or RFC3339 datetime]
-`;
-
-exports[`parseQuery - error message snapshots > completedSince without completed mode 1`] = `
-[Error: Field 'completedSince' has the following issues:
-  'completedSince' requires 'completed' to be 'include' or 'only'.]
-`;
-
 exports[`parseQuery - error message snapshots > filter must be a string 1`] = `
 [Error: Field 'filter' has the following issues:
   Invalid input: expected string, received number]

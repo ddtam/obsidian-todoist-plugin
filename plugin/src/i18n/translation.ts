@@ -243,12 +243,6 @@ export type Translations = {
       unknownKey: (key: string) => string;
       dueAndTime: string;
       projectAndSection: string;
-      completedAutorefreshTooFast: string;
-      completedOnlyFilterCaveat: string;
-    };
-    error: {
-      completedRequiresMode: (key: string) => string;
-      completedUntilBeforeSince: string;
     };
     groupedHeaders: {
       noDueDate: string;

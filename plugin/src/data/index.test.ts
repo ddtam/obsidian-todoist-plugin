@@ -18,7 +18,6 @@ const makeSyncResponse = (overrides?: Partial<SyncResponse>): SyncResponse => ({
 const makeMockApi = (): TodoistApiClient => {
   return {
     getTasks: vi.fn().mockResolvedValue([]),
-    getCompletedTasks: vi.fn().mockResolvedValue([]),
     getTaskById: vi.fn(),
     createTask: vi.fn(),
     closeTask: vi.fn(),
@@ -112,69 +111,6 @@ describe("TodoistAdapter", () => {
       }
       expect(result2.tasks).toHaveLength(1);
       expect(result2.tasks[0].id).toBe("task-2");
-    });
-
-    it("should call getTasks (active) and skip getCompletedTasks for completed=exclude", async () => {
-      vi.mocked(mockApi.getTasks).mockResolvedValue([makeApiTask({ id: "active-1" })]);
-      await adapter.initialize(mockApi);
-
-      const { result } = await subscribeAndRefresh(
-        adapter,
-        makeQuery({ filter: "#test", completed: "exclude" }),
-      );
-
-      expect(mockApi.getTasks).toHaveBeenCalledWith("#test");
-      expect(mockApi.getCompletedTasks).not.toHaveBeenCalled();
-      if (result.type !== "success") {
-        return;
-      }
-      expect(result.tasks.map((t) => t.id)).toEqual(["active-1"]);
-    });
-
-    it("should call getCompletedTasks and skip getTasks for completed=only", async () => {
-      vi.mocked(mockApi.getCompletedTasks).mockResolvedValue([makeApiTask({ id: "done-1" })]);
-      await adapter.initialize(mockApi);
-
-      const { result } = await subscribeAndRefresh(
-        adapter,
-        makeQuery({
-          filter: "",
-          completed: "only",
-          completedSince: "2026-04-01",
-          completedUntil: "2026-05-01",
-          completedLimit: 50,
-        }),
-      );
-
-      expect(mockApi.getTasks).not.toHaveBeenCalled();
-      expect(mockApi.getCompletedTasks).toHaveBeenCalledWith({
-        mode: "byCompletionDate",
-        since: "2026-04-01",
-        until: "2026-05-01",
-        limit: 50,
-      });
-      if (result.type !== "success") {
-        return;
-      }
-      expect(result.tasks.map((t) => t.id)).toEqual(["done-1"]);
-    });
-
-    it("should merge active and completed for completed=include", async () => {
-      vi.mocked(mockApi.getTasks).mockResolvedValue([makeApiTask({ id: "active-1" })]);
-      vi.mocked(mockApi.getCompletedTasks).mockResolvedValue([makeApiTask({ id: "done-1" })]);
-      await adapter.initialize(mockApi);
-
-      const { result } = await subscribeAndRefresh(
-        adapter,
-        makeQuery({ filter: "#test", completed: "include" }),
-      );
-
-      expect(mockApi.getTasks).toHaveBeenCalledWith("#test");
-      expect(mockApi.getCompletedTasks).toHaveBeenCalledTimes(1);
-      if (result.type !== "success") {
-        return;
-      }
-      expect(result.tasks.map((t) => t.id).sort()).toEqual(["active-1", "done-1"]);
     });
   });
 
