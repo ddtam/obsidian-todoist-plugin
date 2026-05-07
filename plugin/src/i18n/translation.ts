@@ -219,6 +219,10 @@ export type Translations = {
         header: string;
         unknownErrorMessage: string;
       };
+      taskBadge: {
+        notFoundHeader: string;
+        notFoundMessage: (id: string) => string;
+      };
     };
     contextMenu: {
       completeTaskLabel: string;
@@ -239,6 +243,12 @@ export type Translations = {
       unknownKey: (key: string) => string;
       dueAndTime: string;
       projectAndSection: string;
+      completedAutorefreshTooFast: string;
+      completedOnlyFilterCaveat: string;
+    };
+    error: {
+      completedRequiresMode: (key: string) => string;
+      completedUntilBeforeSince: string;
     };
     groupedHeaders: {
       noDueDate: string;
@@ -250,6 +260,13 @@ export type Translations = {
     addTask: string;
     addTaskPageContent: string;
     addTaskPageDescription: string;
+    insertTaskRef: string;
+    insertTaskRefNoEditorNotice: string;
+    insertTaskRefModal: {
+      placeholder: string;
+      emptyState: string;
+      fetchFailedNotice: (reason: string) => string;
+    };
   };
   tokenValidation: {
     emptyTokenError: string;

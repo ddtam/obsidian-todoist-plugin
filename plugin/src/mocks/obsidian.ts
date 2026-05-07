@@ -55,3 +55,20 @@ export class MarkdownRenderer {
     return Promise.resolve();
   }
 }
+
+export class Modal {
+  open(): void {}
+  close(): void {}
+  onOpen(): void {}
+  onClose(): void {}
+}
+
+export class SuggestModal<_T> extends Modal {
+  inputEl: HTMLInputElement = document.createElement("input");
+  emptyStateText = "";
+  setPlaceholder(_placeholder: string): void {
+    // mock with empty impl
+  }
+}
+
+export class MarkdownView {}

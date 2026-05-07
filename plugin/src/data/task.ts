@@ -22,4 +22,5 @@ export type Task = {
   duration?: Duration;
   deadline?: Deadline;
   order: number;
+  completedAt?: string;
 };

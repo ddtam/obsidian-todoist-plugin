@@ -37,6 +37,7 @@ export function hydrate(apiTask: ApiTask, data: DataAccessor): Task {
     duration: apiTask.duration ?? undefined,
     deadline: apiTask.deadline ?? undefined,
     order: apiTask.childOrder,
+    completedAt: apiTask.completedAt ?? undefined,
   };
 }
 

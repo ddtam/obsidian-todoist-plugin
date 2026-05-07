@@ -40,6 +40,27 @@ function makePaginatedResponse(
   };
 }
 
+function makeItemsResponse(
+  tasks: Record<string, unknown>[],
+  nextCursor: string | null = null,
+): WebResponse {
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      items: tasks,
+      next_cursor: nextCursor,
+    }),
+  };
+}
+
+function makeCompletedTask(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return makeTask({
+    checked: true,
+    completed_at: "2026-05-01T12:00:00.000000Z",
+    ...overrides,
+  });
+}
+
 function makeFetcher(): WebFetcher & {
   fetch: ReturnType<typeof vi.fn<(params: RequestParams) => Promise<WebResponse>>>;
 } {
@@ -140,6 +161,58 @@ describe("TodoistApiClient", () => {
     });
   });
 
+  describe("getTaskById", () => {
+    it("hits /tasks/{id} and parses response", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce({
+        statusCode: 200,
+        body: JSON.stringify(makeTask({ id: "abc-123", content: "Read book" })),
+      });
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      const task = await client.getTaskById("abc-123");
+
+      expect(task.id).toBe("abc-123");
+      expect(task.content).toBe("Read book");
+
+      const call = fetcher.fetch.mock.calls[0][0];
+      expect(call.method).toBe("GET");
+      expect(parseUrl(call.url).pathname).toBe("/api/v1/tasks/abc-123");
+    });
+
+    it("parses checked + completed_at on a completed task", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce({
+        statusCode: 200,
+        body: JSON.stringify(
+          makeTask({
+            id: "done-1",
+            checked: true,
+            completed_at: "2026-05-01T12:00:00.000000Z",
+          }),
+        ),
+      });
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      const task = await client.getTaskById("done-1");
+
+      expect(task.checked).toBe(true);
+      expect(task.completedAt).toBe("2026-05-01T12:00:00.000000Z");
+    });
+
+    it("throws TodoistApiError on 404", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce({ statusCode: 404, body: "Not Found" });
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      await expect(client.getTaskById("missing")).rejects.toSatisfy((e) => {
+        expect(e).toBeInstanceOf(TodoistApiError);
+        expect((e as TodoistApiError).statusCode).toBe(404);
+        return true;
+      });
+    });
+  });
+
   describe("createTask", () => {
     it("sends POST with correct body serialization including options", async () => {
       const fetcher = makeFetcher();
@@ -182,6 +255,129 @@ describe("TodoistApiClient", () => {
       const body = JSON.parse(call.body as string);
       expect(body.content).toBe("Simple task");
       expect(Object.keys(body)).toEqual(["content"]);
+    });
+  });
+
+  describe("getCompletedTasks", () => {
+    it("hits /tasks/completed/by_completion_date for byCompletionDate mode", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce(makeItemsResponse([makeCompletedTask()]));
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      const tasks = await client.getCompletedTasks({ mode: "byCompletionDate" });
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].checked).toBe(true);
+      expect(tasks[0].completedAt).toBe("2026-05-01T12:00:00.000000Z");
+
+      const call = fetcher.fetch.mock.calls[0][0];
+      const { pathname } = parseUrl(call.url);
+      expect(pathname).toBe("/api/v1/tasks/completed/by_completion_date");
+    });
+
+    it("hits /tasks/completed/by_due_date for byDueDate mode", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce(makeItemsResponse([makeCompletedTask()]));
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      await client.getCompletedTasks({ mode: "byDueDate" });
+
+      const call = fetcher.fetch.mock.calls[0][0];
+      const { pathname } = parseUrl(call.url);
+      expect(pathname).toBe("/api/v1/tasks/completed/by_due_date");
+    });
+
+    it("forwards since/until/limit query params", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce(makeItemsResponse([]));
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      await client.getCompletedTasks({
+        mode: "byCompletionDate",
+        since: "2026-04-01T00:00:00Z",
+        until: "2026-05-01T23:59:59Z",
+        limit: 75,
+      });
+
+      const call = fetcher.fetch.mock.calls[0][0];
+      const { params } = parseUrl(call.url);
+      expect(params.get("since")).toBe("2026-04-01T00:00:00Z");
+      expect(params.get("until")).toBe("2026-05-01T23:59:59Z");
+      expect(params.get("limit")).toBe("75");
+    });
+
+    it("promotes bare ISO date to start-of-day UTC datetime", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce(makeItemsResponse([]));
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      await client.getCompletedTasks({
+        mode: "byCompletionDate",
+        since: "2026-04-01",
+        until: "2026-05-01",
+      });
+
+      const call = fetcher.fetch.mock.calls[0][0];
+      const { params } = parseUrl(call.url);
+      expect(params.get("since")).toBe("2026-04-01T00:00:00Z");
+      expect(params.get("until")).toBe("2026-05-01T00:00:00Z");
+    });
+
+    it("paginates via cursor when next_cursor is non-null", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch
+        .mockResolvedValueOnce(makeItemsResponse([makeCompletedTask({ id: "1" })], "cur-1"))
+        .mockResolvedValueOnce(makeItemsResponse([makeCompletedTask({ id: "2" })]));
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      const tasks = await client.getCompletedTasks({ mode: "byCompletionDate" });
+
+      expect(tasks.map((t) => t.id)).toEqual(["1", "2"]);
+      expect(fetcher.fetch).toHaveBeenCalledTimes(2);
+      const secondCall = fetcher.fetch.mock.calls[1][0];
+      expect(parseUrl(secondCall.url).params.get("cursor")).toBe("cur-1");
+    });
+
+    it("treats a missing next_cursor field as end-of-pagination", async () => {
+      // Real-world: the completed-tasks endpoints OMIT next_cursor from
+      // the response on the last page rather than returning null. The
+      // schema must not reject this.
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce({
+        statusCode: 200,
+        body: JSON.stringify({ items: [makeCompletedTask({ id: "x" })] }),
+      });
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      const tasks = await client.getCompletedTasks({ mode: "byCompletionDate" });
+
+      expect(tasks.map((t) => t.id)).toEqual(["x"]);
+      expect(fetcher.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("stops paginating once limit is reached", async () => {
+      const fetcher = makeFetcher();
+      // Server returns 5 items per page even though we asked for limit=3.
+      // Client should still cap the total at 3 and not request more pages.
+      fetcher.fetch.mockResolvedValueOnce(
+        makeItemsResponse(
+          [
+            makeCompletedTask({ id: "1" }),
+            makeCompletedTask({ id: "2" }),
+            makeCompletedTask({ id: "3" }),
+            makeCompletedTask({ id: "4" }),
+            makeCompletedTask({ id: "5" }),
+          ],
+          "cur-next",
+        ),
+      );
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      const tasks = await client.getCompletedTasks({ mode: "byCompletionDate", limit: 3 });
+
+      expect(tasks).toHaveLength(3);
+      expect(tasks.map((t) => t.id)).toEqual(["1", "2", "3"]);
+      expect(fetcher.fetch).toHaveBeenCalledTimes(1);
     });
   });
 

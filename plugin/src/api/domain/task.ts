@@ -49,6 +49,8 @@ export const taskSchema = z.object({
   duration: durationSchema.nullable(),
   deadline: deadlineSchema.nullable(),
   childOrder: z.number(),
+  checked: z.boolean().optional(),
+  completedAt: z.string().nullable().optional(),
 });
 export type Task = z.infer<typeof taskSchema>;
 

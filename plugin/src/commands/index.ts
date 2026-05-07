@@ -5,6 +5,7 @@ import {
   addTaskWithPageInContent,
   addTaskWithPageInDescription,
 } from "@/commands/addTask";
+import { insertTaskRef } from "@/commands/insertTaskRef";
 import { t } from "@/i18n";
 import type { Translations } from "@/i18n/translation";
 import type TodoistPlugin from "@/index";
@@ -30,6 +31,7 @@ const commands = {
   "add-task": addTask,
   "add-task-page-content": addTaskWithPageInContent,
   "add-task-page-description": addTaskWithPageInDescription,
+  "insert-task-ref": insertTaskRef,
 };
 
 export type CommandId = keyof typeof commands;

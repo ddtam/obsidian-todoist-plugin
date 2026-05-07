@@ -27,7 +27,7 @@ const useSubscription = (
   const [refreshedTimestamp, setRefreshedTimestamp] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
-    const [unsub, refresh] = plugin.services.todoist.subscribe(query.filter, (results) => {
+    const [unsub, refresh] = plugin.services.todoist.subscribe(query, (results) => {
       callback(results);
       setRefreshedTimestamp(new Date());
     });

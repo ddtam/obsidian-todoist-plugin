@@ -4,6 +4,8 @@ import type { TodoistApiClient } from "@/api";
 import type { SyncResponse } from "@/api/domain/sync";
 import { type OnSubscriptionChange, type SubscriptionResult, TodoistAdapter } from "@/data/index";
 import { makeApiTask } from "@/factories/data";
+import { makeQuery } from "@/factories/query";
+import type { TaskQuery } from "@/query/schema/tasks";
 
 const makeSyncResponse = (overrides?: Partial<SyncResponse>): SyncResponse => ({
   syncToken: "token-1",
@@ -16,6 +18,8 @@ const makeSyncResponse = (overrides?: Partial<SyncResponse>): SyncResponse => ({
 const makeMockApi = (): TodoistApiClient => {
   return {
     getTasks: vi.fn().mockResolvedValue([]),
+    getCompletedTasks: vi.fn().mockResolvedValue([]),
+    getTaskById: vi.fn(),
     createTask: vi.fn(),
     closeTask: vi.fn(),
     getUser: vi.fn().mockResolvedValue({ isPremium: false }),
@@ -25,7 +29,7 @@ const makeMockApi = (): TodoistApiClient => {
 
 const subscribeAndRefresh = async (
   adapter: TodoistAdapter,
-  query = "#test",
+  query: TaskQuery = makeQuery({ filter: "#test" }),
 ): Promise<{ result: SubscriptionResult; callback: OnSubscriptionChange }> => {
   let captured: SubscriptionResult = { type: "not-ready" };
   const callback: OnSubscriptionChange = (r) => {
@@ -70,7 +74,7 @@ describe("TodoistAdapter", () => {
         captured = r;
       };
 
-      const [, refresh] = adapter.subscribe("#test", callback);
+      const [, refresh] = adapter.subscribe(makeQuery({ filter: "#test" }), callback);
       await refresh();
 
       expect(captured.type).toBe("not-ready");
@@ -87,7 +91,7 @@ describe("TodoistAdapter", () => {
         captured = r;
       };
 
-      const [, refresh] = adapter.subscribe("#test", callback);
+      const [, refresh] = adapter.subscribe(makeQuery({ filter: "#test" }), callback);
       await refresh();
 
       const result1 = captured as SubscriptionResult;
@@ -108,6 +112,90 @@ describe("TodoistAdapter", () => {
       }
       expect(result2.tasks).toHaveLength(1);
       expect(result2.tasks[0].id).toBe("task-2");
+    });
+
+    it("should call getTasks (active) and skip getCompletedTasks for completed=exclude", async () => {
+      vi.mocked(mockApi.getTasks).mockResolvedValue([makeApiTask({ id: "active-1" })]);
+      await adapter.initialize(mockApi);
+
+      const { result } = await subscribeAndRefresh(
+        adapter,
+        makeQuery({ filter: "#test", completed: "exclude" }),
+      );
+
+      expect(mockApi.getTasks).toHaveBeenCalledWith("#test");
+      expect(mockApi.getCompletedTasks).not.toHaveBeenCalled();
+      if (result.type !== "success") {
+        return;
+      }
+      expect(result.tasks.map((t) => t.id)).toEqual(["active-1"]);
+    });
+
+    it("should call getCompletedTasks and skip getTasks for completed=only", async () => {
+      vi.mocked(mockApi.getCompletedTasks).mockResolvedValue([makeApiTask({ id: "done-1" })]);
+      await adapter.initialize(mockApi);
+
+      const { result } = await subscribeAndRefresh(
+        adapter,
+        makeQuery({
+          filter: "",
+          completed: "only",
+          completedSince: "2026-04-01",
+          completedUntil: "2026-05-01",
+          completedLimit: 50,
+        }),
+      );
+
+      expect(mockApi.getTasks).not.toHaveBeenCalled();
+      expect(mockApi.getCompletedTasks).toHaveBeenCalledWith({
+        mode: "byCompletionDate",
+        since: "2026-04-01",
+        until: "2026-05-01",
+        limit: 50,
+      });
+      if (result.type !== "success") {
+        return;
+      }
+      expect(result.tasks.map((t) => t.id)).toEqual(["done-1"]);
+    });
+
+    it("should merge active and completed for completed=include", async () => {
+      vi.mocked(mockApi.getTasks).mockResolvedValue([makeApiTask({ id: "active-1" })]);
+      vi.mocked(mockApi.getCompletedTasks).mockResolvedValue([makeApiTask({ id: "done-1" })]);
+      await adapter.initialize(mockApi);
+
+      const { result } = await subscribeAndRefresh(
+        adapter,
+        makeQuery({ filter: "#test", completed: "include" }),
+      );
+
+      expect(mockApi.getTasks).toHaveBeenCalledWith("#test");
+      expect(mockApi.getCompletedTasks).toHaveBeenCalledTimes(1);
+      if (result.type !== "success") {
+        return;
+      }
+      expect(result.tasks.map((t) => t.id).sort()).toEqual(["active-1", "done-1"]);
+    });
+  });
+
+  describe("actions.getTask", () => {
+    it("hydrates a task fetched by ID", async () => {
+      vi.mocked(mockApi.getTaskById).mockResolvedValue(
+        makeApiTask({ id: "abc-123", content: "Read book" }),
+      );
+      await adapter.initialize(mockApi);
+
+      const task = await adapter.actions.getTask("abc-123");
+
+      expect(mockApi.getTaskById).toHaveBeenCalledWith("abc-123");
+      expect(task?.id).toBe("abc-123");
+      expect(task?.content).toBe("Read book");
+    });
+
+    it("returns undefined when API client is not initialized", async () => {
+      const task = await adapter.actions.getTask("abc-123");
+      expect(task).toBeUndefined();
+      expect(mockApi.getTaskById).not.toHaveBeenCalled();
     });
   });
 });

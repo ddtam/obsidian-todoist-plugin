@@ -1,0 +1,13 @@
+// The badge delegates rendering to the shared Task component, so it picks up
+// the same separator borders, priority colors, completion treatment, and
+// metadata layout as a single entry in a query block. This wrapper exists
+// only to scope future tweaks if a single-task callout needs to differ from
+// query rows.
+.todoist-task-badge {
+  margin: 0.25em 0;
+}
+
+.todoist-task-badge-loading {
+  min-height: 2em;
+  opacity: 0.5;
+}

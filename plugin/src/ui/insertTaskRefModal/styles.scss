@@ -1,0 +1,14 @@
+.todoist-task-ref-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+}
+
+.todoist-task-ref-suggestion-content {
+  font-weight: 500;
+}
+
+.todoist-task-ref-suggestion-meta {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}

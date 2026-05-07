@@ -9,5 +9,9 @@ export function makeQuery(opts?: Partial<TaskQuery>): TaskQuery {
     show: opts?.show,
     groupBy: opts?.groupBy,
     view: opts?.view,
+    completed: opts?.completed,
+    completedSince: opts?.completedSince,
+    completedUntil: opts?.completedUntil,
+    completedLimit: opts?.completedLimit,
   };
 }

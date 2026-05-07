@@ -243,6 +243,11 @@ export const en: Translations = {
         unknownErrorMessage:
           "Unknown error occurred. Please check the Console in the Developer Tools window for more information",
       },
+      taskBadge: {
+        notFoundHeader: "Task not found",
+        notFoundMessage: (id: string) =>
+          `No task with id '${id}' was found. It may have been deleted or you may not have access to it.`,
+      },
     },
     contextMenu: {
       completeTaskLabel: "Complete task",
@@ -266,6 +271,15 @@ export const en: Translations = {
         "Both 'due' and 'time' show options are set. The 'time' option will be ignored when 'due' is present.",
       projectAndSection:
         "Both 'project' and 'section' show options are set. The 'section' option will be ignored when 'project' is present.",
+      completedAutorefreshTooFast:
+        "autorefresh below 10s is not recommended for completed-task queries due to API rate limits.",
+      completedOnlyFilterCaveat:
+        "filter expressions may not apply to completed tasks; results may differ from active queries.",
+    },
+    error: {
+      completedRequiresMode: (key: string) =>
+        `'${key}' requires 'completed' to be 'include' or 'only'.`,
+      completedUntilBeforeSince: "'completedUntil' must be the same as or after 'completedSince'.",
     },
     groupedHeaders: {
       noDueDate: "No due date",
@@ -277,6 +291,13 @@ export const en: Translations = {
     addTask: "Add task",
     addTaskPageContent: "Add task with current page in task content",
     addTaskPageDescription: "Add task with current page in task description",
+    insertTaskRef: "Insert Todoist task reference",
+    insertTaskRefNoEditorNotice: "Open a markdown editor before inserting a task reference.",
+    insertTaskRefModal: {
+      placeholder: "Search tasks by content or project...",
+      emptyState: "No matching tasks.",
+      fetchFailedNotice: (reason: string) => `Failed to load tasks: ${reason}`,
+    },
   },
   tokenValidation: {
     emptyTokenError: "API token must not be empty",

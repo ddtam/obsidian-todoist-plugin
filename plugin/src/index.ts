@@ -30,6 +30,10 @@ export default class TodoistPlugin extends Plugin {
       "todoist",
       queryInjector.onNewBlock.bind(queryInjector),
     );
+    this.registerMarkdownCodeBlockProcessor(
+      "todoist-task",
+      queryInjector.onNewTaskRefBlock.bind(queryInjector),
+    );
     this.addSettingTab(new SettingsTab(this.app, this));
 
     registerCommands(this);

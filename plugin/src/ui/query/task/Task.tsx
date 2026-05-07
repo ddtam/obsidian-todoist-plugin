@@ -45,7 +45,8 @@ export const Task: React.FC<Props> = ({ tree }) => {
     }
   };
 
-  const isDisabled = tree.content.startsWith("*");
+  const isCompleted = tree.completedAt !== undefined;
+  const isDisabled = tree.content.startsWith("*") || isCompleted;
 
   const shouldRenderDescription =
     (query.show?.has("description") ?? true) && tree.description !== "";
@@ -60,6 +61,7 @@ export const Task: React.FC<Props> = ({ tree }) => {
         data-priority={tree.priority}
         data-due-metadata={getDueMetadataInfo(tree)}
         data-has-time={getTimeMetadataInfo(tree)}
+        data-completed={isCompleted}
         initial={{
           opacity: transitionOpacity,
         }}
@@ -76,7 +78,7 @@ export const Task: React.FC<Props> = ({ tree }) => {
         <Checkbox
           className="todoist-task-checkbox"
           isDisabled={isDisabled}
-          isSelected={false}
+          isSelected={isCompleted}
           onChange={onClickTask}
         >
           <div />

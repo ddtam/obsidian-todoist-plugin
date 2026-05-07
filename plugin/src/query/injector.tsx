@@ -8,6 +8,7 @@ import type TodoistPlugin from "@/index";
 import { debug } from "@/log";
 import { parseQuery } from "@/query/parser";
 import { applyReplacements } from "@/query/replacements";
+import { taskRefQueryDefinition } from "@/query/schema/taskRef";
 import { taskQueryDefinition } from "@/query/schema/tasks";
 import {
   type MarkdownEditButton,
@@ -17,6 +18,7 @@ import {
 } from "@/ui/context";
 import { QueryError } from "@/ui/query/QueryError";
 import { QueryRoot } from "@/ui/query/QueryRoot";
+import { TaskBadge } from "@/ui/taskBadge/TaskBadge";
 
 export class QueryInjector {
   private readonly plugin: TodoistPlugin;
@@ -57,6 +59,26 @@ export class QueryInjector {
         },
         false,
       );
+    }
+
+    ctx.addChild(child);
+  }
+
+  onNewTaskRefBlock(source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
+    let child: MarkdownRenderChild;
+
+    try {
+      const [query] = parseQuery(source, taskRefQueryDefinition);
+
+      debug({
+        msg: "Parsed task ref",
+        context: query,
+      });
+
+      child = new ReactRenderer(el, this.plugin, TaskBadge, { query }, false);
+    } catch (e) {
+      console.error(e);
+      child = new ReactRenderer(el, this.plugin, QueryError, { error: e }, false);
     }
 
     ctx.addChild(child);

@@ -16,6 +16,7 @@ import {
   type UnsubscribeCallback,
 } from "@/data/subscriptions";
 import type { Task } from "@/data/task";
+import type { TaskQuery } from "@/query/schema/tasks";
 import { Maybe } from "@/utils/maybe";
 
 export { QueryErrorKind } from "@/data/errors";
@@ -26,6 +27,20 @@ export class TodoistAdapter {
     closeTask: async (id: TaskId) => await this.closeTask(id),
     createTask: async (content: string, params: CreateTaskParams): Promise<ApiTask> =>
       await this.api.withInner((api) => api.createTask(content, params)),
+    getTask: async (id: TaskId): Promise<Task | undefined> => {
+      if (!this.api.hasValue()) {
+        return undefined;
+      }
+      const apiTask = await this.api.withInner((api) => api.getTaskById(id));
+      return hydrate(apiTask, this.data());
+    },
+    fetchActiveTasks: async (): Promise<Task[]> => {
+      if (!this.api.hasValue()) {
+        return [];
+      }
+      const apiTasks = await this.api.withInner((api) => api.getTasks());
+      return apiTasks.map((t) => hydrate(t, this.data()));
+    },
   };
 
   private readonly api: Maybe<TodoistApiClient> = Maybe.Empty();
@@ -111,21 +126,53 @@ export class TodoistAdapter {
     };
   }
 
-  public subscribe(query: string, callback: OnSubscriptionChange): [UnsubscribeCallback, Refresh] {
+  public subscribe(
+    query: TaskQuery,
+    callback: OnSubscriptionChange,
+  ): [UnsubscribeCallback, Refresh] {
     const fetcher = this.buildQueryFetcher(query);
     const subscription = new Subscription(callback, fetcher, () => true);
     return [this.subscriptions.subscribe(subscription), subscription.update];
   }
 
-  private buildQueryFetcher(query: string): SubscriptionFetcher {
+  private buildQueryFetcher(query: TaskQuery): SubscriptionFetcher {
     return async () => {
       if (!this.api.hasValue()) {
         return undefined;
       }
-      const data = await this.api.withInner((api) => api.getTasks(query));
-      const hydrated = data.map((t) => hydrate(t, this.data()));
-      return hydrated;
+      const mode = query.completed ?? "exclude";
+
+      if (mode === "exclude") {
+        return await this.fetchActive(query);
+      }
+
+      if (mode === "only") {
+        return await this.fetchCompleted(query);
+      }
+
+      const [active, completed] = await Promise.all([
+        this.fetchActive(query),
+        this.fetchCompleted(query),
+      ]);
+      return [...active, ...completed];
     };
+  }
+
+  private async fetchActive(query: TaskQuery): Promise<Task[]> {
+    const data = await this.api.withInner((api) => api.getTasks(query.filter));
+    return data.map((t) => hydrate(t, this.data()));
+  }
+
+  private async fetchCompleted(query: TaskQuery): Promise<Task[]> {
+    const data = await this.api.withInner((api) =>
+      api.getCompletedTasks({
+        mode: "byCompletionDate",
+        since: query.completedSince,
+        until: query.completedUntil,
+        limit: query.completedLimit,
+      }),
+    );
+    return data.map((t) => hydrate(t, this.data()));
   }
 
   private async closeTask(id: TaskId): Promise<void> {

@@ -121,6 +121,29 @@
     }
   }
 
+  &[data-completed="true"] {
+    .todoist-task-checkbox div {
+      background-color: var(--interactive-accent);
+      border-color: var(--interactive-accent);
+
+      &::after {
+        content: "✓";
+        display: block;
+        text-align: center;
+        line-height: 14px;
+        font-size: 12px;
+        font-weight: bold;
+        color: var(--text-on-accent);
+      }
+    }
+
+    .todoist-task-content,
+    .todoist-task-description {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+  }
+
   .todoist-task {
     margin-left: 0.5em;
     width: 100%;
