@@ -79,7 +79,14 @@ for (const f of ["main.js", "styles.css"]) {
 }
 console.log("copied: main.js, styles.css");
 
-// 5. Determine fork remote + GitHub repo (org/repo)
+// 5. Regenerate translation status. The premerge workflow's
+// "Check for generated file changes" step fails if this drifts, so
+// running gen here keeps every release's commit consistent. Idempotent
+// when no translation keys have changed.
+console.log("\n--- regenerating translation-status.json ---");
+execSync("npm run gen", { cwd: root, stdio: "inherit" });
+
+// 6. Determine fork remote + GitHub repo (org/repo)
 let forkRemote = "fork";
 try {
   execSync("git remote get-url fork", { cwd: root, stdio: "ignore" });
@@ -100,7 +107,7 @@ if (!repoMatch) {
 const repo = repoMatch[1];
 console.log(`\nfork remote: ${forkRemote} -> ${repo}`);
 
-// 6. Auto-generate notes from commits since the previous release tag,
+// 7. Auto-generate notes from commits since the previous release tag,
 //    unless the user supplied --notes.
 let notes;
 if (userNotes !== undefined) {
@@ -119,13 +126,16 @@ if (userNotes !== undefined) {
   }
 }
 
-// 7. Commit + push
+// 8. Commit + push
 console.log("\n--- committing + pushing ---");
-execSync("git add manifest.json versions.json main.js styles.css", { cwd: root, stdio: "inherit" });
+execSync(
+  "git add manifest.json versions.json main.js styles.css docs/docs/translation-status.json",
+  { cwd: root, stdio: "inherit" },
+);
 execSync(`git commit -m "release: ${version}"`, { cwd: root, stdio: "inherit" });
 execSync("git push", { cwd: root, stdio: "inherit" });
 
-// 8. Create GitHub release
+// 9. Create GitHub release
 console.log("\n--- creating GitHub release ---");
 execSync(
   `gh release create ${version} main.js styles.css manifest.json` +
