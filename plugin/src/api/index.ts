@@ -58,7 +58,7 @@ export class TodoistApiClient {
   public async sync(token: SyncToken): Promise<SyncResponse> {
     const queryParams = snakify({
       syncToken: token,
-      resourceTypes: JSON.stringify(["projects", "labels", "sections"]),
+      resourceTypes: JSON.stringify(["projects", "labels", "sections", "items"]),
     });
     const response = await this.do("/sync", "POST", { queryParams });
     return parseApiResponse(syncResponseSchema, response.body);

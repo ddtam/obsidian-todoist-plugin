@@ -12,6 +12,7 @@ const makeSyncResponse = (overrides?: Partial<SyncResponse>): SyncResponse => ({
   projects: [],
   sections: [],
   labels: [],
+  items: [],
   ...overrides,
 });
 
@@ -115,23 +116,82 @@ describe("TodoistAdapter", () => {
   });
 
   describe("actions.getTask", () => {
-    it("hydrates a task fetched by ID", async () => {
-      vi.mocked(mockApi.getTaskById).mockResolvedValue(
-        makeApiTask({ id: "abc-123", content: "Read book" }),
+    it("returns the task from the local sync cache without calling the API", async () => {
+      vi.mocked(mockApi.sync).mockResolvedValueOnce(
+        makeSyncResponse({
+          items: [makeApiTask({ id: "cached-1", content: "Cached task" })],
+        }),
       );
       await adapter.initialize(mockApi);
 
-      const task = await adapter.actions.getTask("abc-123");
+      const task = await adapter.actions.getTask("cached-1");
 
-      expect(mockApi.getTaskById).toHaveBeenCalledWith("abc-123");
-      expect(task?.id).toBe("abc-123");
-      expect(task?.content).toBe("Read book");
+      expect(task?.id).toBe("cached-1");
+      expect(task?.content).toBe("Cached task");
+      expect(mockApi.getTaskById).not.toHaveBeenCalled();
     });
 
-    it("returns undefined when API client is not initialized", async () => {
+    it("falls back to GET /tasks/{id} on cache miss", async () => {
+      vi.mocked(mockApi.getTaskById).mockResolvedValue(
+        makeApiTask({ id: "uncached", content: "Fresh fetch" }),
+      );
+      await adapter.initialize(mockApi);
+
+      const task = await adapter.actions.getTask("uncached");
+
+      expect(mockApi.getTaskById).toHaveBeenCalledWith("uncached");
+      expect(task?.id).toBe("uncached");
+      expect(task?.content).toBe("Fresh fetch");
+    });
+
+    it("returns undefined when API client is not initialized AND cache is empty", async () => {
       const task = await adapter.actions.getTask("abc-123");
       expect(task).toBeUndefined();
       expect(mockApi.getTaskById).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("dumpCache + restoreCache", () => {
+    it("round-trips synced state", async () => {
+      vi.mocked(mockApi.sync).mockResolvedValueOnce(
+        makeSyncResponse({
+          syncToken: "snapshot-token",
+          items: [
+            makeApiTask({ id: "t1", content: "Task one" }),
+            makeApiTask({ id: "t2", content: "Task two" }),
+          ],
+        }),
+      );
+      await adapter.initialize(mockApi);
+
+      const dumped = adapter.dumpCache();
+      expect(dumped.syncToken).toBe("snapshot-token");
+      expect(dumped.tasks.map((t) => t.id).sort()).toEqual(["t1", "t2"]);
+
+      // Fresh adapter, restored from the dump — should serve the same tasks
+      // without an API call.
+      const restored = new TodoistAdapter();
+      restored.restoreCache(dumped);
+
+      expect((await restored.actions.getTask("t1"))?.content).toBe("Task one");
+      expect((await restored.actions.getTask("t2"))?.content).toBe("Task two");
+      // Sanity: no API was injected, so a cache miss would surface as undefined.
+      expect(await restored.actions.getTask("never-existed")).toBeUndefined();
+    });
+
+    it("excludes deleted tasks from the dump", async () => {
+      vi.mocked(mockApi.sync).mockResolvedValueOnce(
+        makeSyncResponse({
+          items: [
+            makeApiTask({ id: "alive", content: "still here" }),
+            { ...makeApiTask({ id: "gone" }), isDeleted: true },
+          ],
+        }),
+      );
+      await adapter.initialize(mockApi);
+
+      const dumped = adapter.dumpCache();
+      expect(dumped.tasks.map((t) => t.id)).toEqual(["alive"]);
     });
   });
 });

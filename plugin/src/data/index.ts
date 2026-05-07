@@ -5,6 +5,7 @@ import type { Section, SectionId } from "@/api/domain/section";
 import type { SyncToken } from "@/api/domain/sync";
 import type { Task as ApiTask, CreateTaskParams, TaskId } from "@/api/domain/task";
 import type { UserInfo } from "@/api/domain/user";
+import type { CachedSync } from "@/data/cache";
 import { mapApiError } from "@/data/errors";
 import { type DataAccessor, hydrate } from "@/data/hydrate";
 import { Repository } from "@/data/repository";
@@ -16,6 +17,7 @@ import {
   type UnsubscribeCallback,
 } from "@/data/subscriptions";
 import type { Task } from "@/data/task";
+import { TaskRepository } from "@/data/taskRepository";
 import { timezone } from "@/infra/time";
 import type { TaskQuery } from "@/query/schema/tasks";
 import { rewriteFilterDates } from "@/utils/filterDates";
@@ -37,6 +39,12 @@ export class TodoistAdapter {
     createTask: async (content: string, params: CreateTaskParams): Promise<ApiTask> =>
       await this.api.withInner((api) => api.createTask(content, params)),
     getTask: async (id: TaskId): Promise<Task | undefined> => {
+      // Try the local sync cache first — instant, works offline. Sync covers
+      // active tasks; completed tasks are never in the cache.
+      const cached = this.tasks.byId(id);
+      if (cached !== undefined) {
+        return hydrate(cached, this.data());
+      }
       if (!this.api.hasValue()) {
         return undefined;
       }
@@ -56,6 +64,7 @@ export class TodoistAdapter {
   private readonly projects: Repository<ProjectId, Project>;
   private readonly sections: Repository<SectionId, Section>;
   private readonly labels: Repository<LabelId, Label>;
+  private readonly tasks: TaskRepository;
   private readonly subscriptions: SubscriptionManager<Subscription>;
 
   private readonly tasksPendingClose: TaskId[];
@@ -68,6 +77,7 @@ export class TodoistAdapter {
     this.projects = new Repository<ProjectId, Project>();
     this.sections = new Repository<SectionId, Section>();
     this.labels = new Repository<LabelId, Label>();
+    this.tasks = new TaskRepository();
     this.subscriptions = new SubscriptionManager<Subscription>();
     this.tasksPendingClose = [];
   }
@@ -121,6 +131,7 @@ export class TodoistAdapter {
       this.projects.applyDiff(response.projects);
       this.sections.applyDiff(response.sections);
       this.labels.applyDiff(response.labels);
+      this.tasks.applyDiff(response.items);
       this.syncToken = response.syncToken;
     } catch (error) {
       console.error("Failed to sync metadata:", error);
@@ -133,6 +144,32 @@ export class TodoistAdapter {
       sections: this.sections,
       labels: this.labels,
     };
+  }
+
+  // Serialize the in-memory state for persistence. Returned object is
+  // JSON-friendly (no class instances, no functions) and round-trips
+  // through `cachedSyncSchema`.
+  public dumpCache(): CachedSync {
+    return {
+      syncToken: this.syncToken,
+      tasks: [...this.tasks.iter()],
+      projects: [...this.projects.iter()],
+      sections: [...this.sections.iter()],
+      labels: [...this.labels.iter()],
+      savedAt: new Date().toISOString(),
+    };
+  }
+
+  // Hydrate the repositories from a previously-persisted cache. Should be
+  // called once at plugin start, before the first network sync. The cache
+  // is treated as a partial state that the next `sync()` will refresh
+  // incrementally using the cached sync token.
+  public restoreCache(cache: CachedSync): void {
+    this.syncToken = cache.syncToken;
+    this.projects.applyDiff(cache.projects);
+    this.sections.applyDiff(cache.sections);
+    this.labels.applyDiff(cache.labels);
+    this.tasks.applyDiff(cache.tasks);
   }
 
   public subscribe(

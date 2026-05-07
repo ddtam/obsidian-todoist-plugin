@@ -51,6 +51,9 @@ export const taskSchema = z.object({
   childOrder: z.number(),
   checked: z.boolean().optional(),
   completedAt: z.string().nullable().optional(),
+  // Sync API includes this; REST endpoints typically don't surface deleted
+  // tasks, but we tolerate the field for both paths.
+  isDeleted: z.boolean().optional(),
 });
 export type Task = z.infer<typeof taskSchema>;
 

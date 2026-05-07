@@ -34,15 +34,18 @@ export const TaskBadge: React.FC<Props> = ({ query }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchTask = useCallback(async () => {
-    if (!plugin.services.todoist.isReady()) {
-      // Adapter still wiring up post-reload. Stay in loading; the
-      // ready-poll effect below will retry once the initial sync is done.
-      return;
-    }
     setIsRefreshing(true);
     try {
       const task = await plugin.services.todoist.actions.getTask(query.id);
-      setState(task === undefined ? { kind: "not-found" } : { kind: "ready", task });
+      if (task !== undefined) {
+        setState({ kind: "ready", task });
+        return;
+      }
+      // `undefined` means cache miss AND API not initialized yet — stay in
+      // loading so the ready-poll effect can retry once the network sync
+      // finishes. Reserving the "not-found" state for an actual API 404
+      // (which surfaces as a thrown error today; a 404 mapping would route
+      // here in the future).
     } catch (error: unknown) {
       console.error("Failed to fetch task badge", error);
       setState({ kind: "error", error: mapApiError(error) });
@@ -51,12 +54,13 @@ export const TaskBadge: React.FC<Props> = ({ query }) => {
     }
   }, [plugin, query.id]);
 
-  // Initial fetch — if the plugin hasn't finished its first sync yet
-  // (common right after Obsidian reloads a plugin), poll briefly until
-  // it's ready instead of flashing "task not found."
+  // Try the cache (and the API if ready) immediately on mount. If neither
+  // satisfies, poll until the adapter is ready and try again. This means
+  // cached tasks render instantly on plugin reload — without waiting for
+  // the next network sync to flip `isReady()`.
   useEffect(() => {
+    fetchTask();
     if (plugin.services.todoist.isReady()) {
-      fetchTask();
       return;
     }
     const READY_POLL_INTERVAL_MS = 250;

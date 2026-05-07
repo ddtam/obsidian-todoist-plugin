@@ -3,6 +3,7 @@ import { z } from "zod";
 import { labelSchema } from "@/api/domain/label";
 import { projectSchema } from "@/api/domain/project";
 import { sectionSchema } from "@/api/domain/section";
+import { taskSchema } from "@/api/domain/task";
 
 export const syncTokenSchema = z.string();
 export type SyncToken = z.infer<typeof syncTokenSchema>;
@@ -12,6 +13,9 @@ export const syncResponseSchema = z.object({
   labels: z.array(labelSchema),
   projects: z.array(projectSchema),
   sections: z.array(sectionSchema),
+  // Active tasks (Todoist's sync API uses `items` for tasks; camelize
+  // converts to camelCase, but `items` is already camelCase).
+  items: z.array(taskSchema),
 });
 
 export type SyncResponse = z.infer<typeof syncResponseSchema>;

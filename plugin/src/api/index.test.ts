@@ -313,6 +313,7 @@ describe("TodoistApiClient", () => {
           projects: [],
           sections: [],
           labels: [],
+          items: [],
         }),
       });
 
@@ -325,7 +326,9 @@ describe("TodoistApiClient", () => {
       expect(call.method).toBe("POST");
       const { params } = parseUrl(call.url);
       expect(params.get("sync_token")).toBe("old-token");
-      expect(params.get("resource_types")).not.toBeNull();
+      const resourceTypes = params.get("resource_types");
+      expect(resourceTypes).not.toBeNull();
+      expect(JSON.parse(resourceTypes as string)).toContain("items");
     });
   });
 

@@ -6,7 +6,9 @@ import { type App, Notice, Plugin } from "obsidian";
 import { TodoistApiClient } from "@/api";
 import { ObsidianFetcher } from "@/api/fetcher";
 import { registerCommands } from "@/commands";
+import { cachedSyncSchema } from "@/data/cache";
 import { secondsToMillis } from "@/infra/time";
+import { debug } from "@/log";
 import { QueryInjector } from "@/query/injector";
 import { makeServices, type Services } from "@/services";
 import { type Settings, useSettingsStore } from "@/settings";
@@ -40,6 +42,7 @@ export default class TodoistPlugin extends Plugin {
     setLanguage(document.documentElement.lang);
 
     await this.loadOptions();
+    await this.loadCacheFromDisk();
 
     this.app.workspace.onLayoutReady(async () => {
       try {
@@ -49,13 +52,58 @@ export default class TodoistPlugin extends Plugin {
         new Notice(t().notices.migrationFailed);
       }
       await this.loadApiClient();
+      // First sync as part of initialize() has populated the cache; persist
+      // it so the next plugin reload starts from a fresh snapshot.
+      await this.saveCacheToDisk();
     });
 
     this.registerInterval(
       window.setInterval(async () => {
         await this.services.todoist.sync();
+        await this.saveCacheToDisk();
       }, metadataSyncIntervalMs),
     );
+  }
+
+  private cacheFilePath(): string {
+    const dir = this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
+    return `${dir}/cache.json`;
+  }
+
+  private async loadCacheFromDisk(): Promise<void> {
+    const path = this.cacheFilePath();
+    try {
+      const exists = await this.app.vault.adapter.exists(path);
+      if (!exists) {
+        return;
+      }
+      const raw = await this.app.vault.adapter.read(path);
+      const parsed = cachedSyncSchema.safeParse(JSON.parse(raw));
+      if (!parsed.success) {
+        debug({
+          msg: "cache.json failed schema validation, starting fresh",
+          context: parsed.error,
+        });
+        return;
+      }
+      this.services.todoist.restoreCache(parsed.data);
+      debug({
+        msg: "Restored cache from disk",
+        context: { tasks: parsed.data.tasks.length, savedAt: parsed.data.savedAt },
+      });
+    } catch (error) {
+      console.error("Failed to load cache from disk:", error);
+    }
+  }
+
+  private async saveCacheToDisk(): Promise<void> {
+    const path = this.cacheFilePath();
+    try {
+      const cache = this.services.todoist.dumpCache();
+      await this.app.vault.adapter.write(path, JSON.stringify(cache));
+    } catch (error) {
+      console.error("Failed to save cache to disk:", error);
+    }
   }
 
   private async loadApiClient(): Promise<void> {

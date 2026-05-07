@@ -4,7 +4,7 @@
   "description": "A Todoist plugin for Obsidian",
   "scripts": {
     "check": "tsgo --noEmit",
-    "dev": "npm run check && VITE_ENV=dev vite build",
+    "dev": "npm run check && VITE_ENV=dev vite build --watch",
     "build": "vite build",
     "test": "vitest",
     "test:update": "vitest --update",
