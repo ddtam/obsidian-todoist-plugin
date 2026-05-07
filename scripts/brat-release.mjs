@@ -28,7 +28,7 @@ const die = (msg) => {
 const args = process.argv.slice(2);
 const version = args[0];
 if (!version || version.startsWith("--")) {
-  die("version is required\n  usage: npm run brat:release -- <version> [--notes \"...\"]");
+  die('version is required\n  usage: npm run brat:release -- <version> [--notes "..."]');
 }
 
 let userNotes;
