@@ -247,6 +247,7 @@ export const en: Translations = {
         notFoundHeader: "Task not found",
         notFoundMessage: (id: string) =>
           `No task with id '${id}' was found. It may have been deleted or you may not have access to it.`,
+        refreshLabel: "Refresh task",
       },
     },
     contextMenu: {

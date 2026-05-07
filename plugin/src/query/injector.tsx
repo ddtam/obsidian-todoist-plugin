@@ -75,7 +75,7 @@ export class QueryInjector {
         context: query,
       });
 
-      child = new ReactRenderer(el, this.plugin, TaskBadge, { query }, false);
+      child = new ReactRenderer(el, this.plugin, TaskBadge, { query }, true);
     } catch (e) {
       console.error(e);
       child = new ReactRenderer(el, this.plugin, QueryError, { error: e }, false);

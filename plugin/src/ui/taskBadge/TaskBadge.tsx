@@ -1,3 +1,4 @@
+import classNames from "classnames";
 import { domAnimation, LazyMotion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -10,7 +11,8 @@ import { t } from "@/i18n";
 import { secondsToMillis } from "@/infra/time";
 import type { TaskRefQuery } from "@/query/schema/taskRef";
 import { Callout } from "@/ui/components/callout";
-import { PluginContext, QueryContext } from "@/ui/context";
+import { IconButton } from "@/ui/components/iconButton";
+import { MarkdownEditButtonContext, PluginContext, QueryContext } from "@/ui/context";
 import { ErrorDisplay } from "@/ui/query/displays/ErrorDisplay";
 import { Task } from "@/ui/query/task/Task";
 import "./styles.scss";
@@ -27,7 +29,9 @@ type Props = {
 
 export const TaskBadge: React.FC<Props> = ({ query }) => {
   const plugin = PluginContext.use();
+  const { click: editBlock } = MarkdownEditButtonContext.use()();
   const [state, setState] = useState<State>({ kind: "loading" });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchTask = useCallback(async () => {
     if (!plugin.services.todoist.isReady()) {
@@ -35,12 +39,15 @@ export const TaskBadge: React.FC<Props> = ({ query }) => {
       // ready-poll effect below will retry once the initial sync is done.
       return;
     }
+    setIsRefreshing(true);
     try {
       const task = await plugin.services.todoist.actions.getTask(query.id);
       setState(task === undefined ? { kind: "not-found" } : { kind: "ready", task });
     } catch (error: unknown) {
       console.error("Failed to fetch task badge", error);
       setState({ kind: "error", error: mapApiError(error) });
+    } finally {
+      setIsRefreshing(false);
     }
   }, [plugin, query.id]);
 
@@ -95,6 +102,7 @@ export const TaskBadge: React.FC<Props> = ({ query }) => {
   }
 
   const tree: TaskTree = { ...state.task, children: [] };
+  const refreshLabel = t().query.displays.taskBadge.refreshLabel;
 
   return (
     <LazyMotion features={domAnimation}>
@@ -102,6 +110,23 @@ export const TaskBadge: React.FC<Props> = ({ query }) => {
         <QueryContext.Provider value={defaultQuery}>
           <Task tree={tree} onAfterToggle={fetchTask} />
         </QueryContext.Provider>
+        <div className="todoist-task-badge-controls">
+          <IconButton
+            className={classNames("todoist-task-badge-control-button refresh", {
+              "is-refreshing": isRefreshing,
+            })}
+            iconId="refresh-ccw"
+            tooltip={refreshLabel}
+            action={fetchTask}
+          />
+          <IconButton
+            className="todoist-task-badge-control-button edit"
+            iconId="lucide-code-2"
+            action={() => {
+              editBlock();
+            }}
+          />
+        </div>
       </div>
     </LazyMotion>
   );

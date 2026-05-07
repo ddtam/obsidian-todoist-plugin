@@ -222,6 +222,7 @@ export type Translations = {
       taskBadge: {
         notFoundHeader: string;
         notFoundMessage: (id: string) => string;
+        refreshLabel: string;
       };
     };
     contextMenu: {

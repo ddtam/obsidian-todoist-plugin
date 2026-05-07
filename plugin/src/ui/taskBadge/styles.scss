@@ -4,10 +4,61 @@
 // only to scope future tweaks if a single-task callout needs to differ from
 // query rows.
 .todoist-task-badge {
+  position: relative;
   margin: 0.25em 0;
 }
 
 .todoist-task-badge-loading {
   min-height: 2em;
   opacity: 0.5;
+}
+
+// Hover-revealed control row. Mirrors `.todoist-query-controls` styling so
+// the affordance is consistent with the query block's header buttons.
+.todoist-task-badge-controls {
+  position: absolute;
+  top: 0.5em;
+  right: 0.5em;
+  display: flex;
+  align-items: center;
+  justify-content: end;
+
+  * + * {
+    margin-left: 0.5em;
+  }
+
+  .todoist-task-badge-control-button {
+    padding: var(--size-2-2) var(--size-2-3);
+    color: var(--text-muted);
+    background-color: var(--background-primary);
+    border-radius: var(--radius-s);
+    border: 1px solid var(--color-base-40);
+    box-shadow: none;
+
+    transition: opacity 0.33s;
+    opacity: 0;
+
+    .block-language-todoist-task:hover & {
+      opacity: 1;
+    }
+
+    &:hover {
+      background-color: inherit;
+      border: 1px solid var(--interactive-accent);
+    }
+
+    // Reading view has no editor to invoke; hide the edit button there.
+    .markdown-reading-view &.edit {
+      display: none;
+    }
+
+    &.refresh.is-refreshing > .obsidian-icon {
+      @-webkit-keyframes spin {
+        100% {
+          -webkit-transform: rotate(360deg);
+        }
+      }
+      animation: spin 1s linear infinite reverse;
+    }
+  }
 }

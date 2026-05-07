@@ -1,14 +1,11 @@
 import classNames from "classnames";
 import type React from "react";
-import { useRef } from "react";
-import { Button } from "react-aria-components";
 
 import { type CommandId, fireCommand } from "@/commands";
 import { t } from "@/i18n";
 import { type Settings, useSettingsStore } from "@/settings";
-import { ObsidianIcon } from "@/ui/components/obsidian-icon";
+import { IconButton } from "@/ui/components/iconButton";
 import { MarkdownEditButtonContext, PluginContext } from "@/ui/context";
-import { useObsidianTooltip } from "@/ui/hooks";
 
 const getAddTaskCommandId = (settings: Settings): CommandId => {
   switch (settings.addTaskButtonAddsPageLink) {
@@ -53,13 +50,13 @@ export const QueryHeader: React.FC<Props> = ({
     <div className="todoist-query-header">
       <span className="todoist-query-title">{title}</span>
       <div className="todoist-query-controls">
-        <HeaderButton
-          className="add-task"
+        <IconButton
+          className="todoist-query-control-button add-task"
           iconId="plus"
           action={() => fireCommand(getAddTaskCommandId(settings), plugin)}
         />
-        <HeaderButton
-          className={classNames("refresh-query", {
+        <IconButton
+          className={classNames("todoist-query-control-button refresh-query", {
             "is-refreshing": isFetching,
           })}
           iconId="refresh-ccw"
@@ -68,8 +65,8 @@ export const QueryHeader: React.FC<Props> = ({
           }}
           tooltip={refreshedAtDisplay}
         />
-        <HeaderButton
-          className="edit-query"
+        <IconButton
+          className="todoist-query-control-button edit-query"
           iconId="lucide-code-2"
           action={() => {
             editBlock();
@@ -77,36 +74,5 @@ export const QueryHeader: React.FC<Props> = ({
         />
       </div>
     </div>
-  );
-};
-
-type ButtonProps = {
-  iconId: string;
-  action: () => Promise<void> | void;
-  className: string;
-  tooltip?: string;
-};
-
-const HeaderButton: React.FC<ButtonProps> = ({ iconId, action, className, tooltip }) => {
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  const handler = async () => {
-    const result = action();
-
-    if (result instanceof Promise) {
-      await result;
-    }
-  };
-
-  useObsidianTooltip(buttonRef.current, tooltip ?? "");
-
-  return (
-    <Button
-      className={classNames("todoist-query-control-button", className)}
-      onPress={handler}
-      ref={buttonRef}
-    >
-      <ObsidianIcon id={iconId} size="s" />
-    </Button>
   );
 };
