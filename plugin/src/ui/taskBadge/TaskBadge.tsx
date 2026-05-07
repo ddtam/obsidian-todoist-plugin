@@ -100,7 +100,7 @@ export const TaskBadge: React.FC<Props> = ({ query }) => {
     <LazyMotion features={domAnimation}>
       <div className="todoist-task-badge">
         <QueryContext.Provider value={defaultQuery}>
-          <Task tree={tree} />
+          <Task tree={tree} onAfterToggle={fetchTask} />
         </QueryContext.Provider>
       </div>
     </LazyMotion>

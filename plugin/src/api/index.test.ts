@@ -254,6 +254,35 @@ describe("TodoistApiClient", () => {
     });
   });
 
+  describe("reopenTask", () => {
+    it("sends POST to /tasks/{id}/reopen without body or Content-Type", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce({ statusCode: 204, body: "" });
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      await client.reopenTask("task-789");
+
+      const call = fetcher.fetch.mock.calls[0][0];
+      expect(call.method).toBe("POST");
+      const { pathname } = parseUrl(call.url);
+      expect(pathname).toBe("/api/v1/tasks/task-789/reopen");
+      expect(call.body).toBeUndefined();
+      expect(call.headers["Content-Type"]).toBeUndefined();
+    });
+
+    it("propagates errors from the API", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce({ statusCode: 404, body: "Not Found" });
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      await expect(client.reopenTask("missing")).rejects.toSatisfy((e) => {
+        expect(e).toBeInstanceOf(TodoistApiError);
+        expect((e as TodoistApiError).statusCode).toBe(404);
+        return true;
+      });
+    });
+  });
+
   describe("getUser", () => {
     it("calls /user endpoint and parses response", async () => {
       const fetcher = makeFetcher();

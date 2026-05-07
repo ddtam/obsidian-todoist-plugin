@@ -251,6 +251,7 @@ export const en: Translations = {
     },
     contextMenu: {
       completeTaskLabel: "Complete task",
+      reopenTaskLabel: "Reopen task",
       openTaskInAppLabel: "Open task in Todoist (app)",
       openTaskInBrowserLabel: "Open task in Todoist (web)",
     },

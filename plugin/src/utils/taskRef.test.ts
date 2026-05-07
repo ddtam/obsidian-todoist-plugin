@@ -11,8 +11,12 @@ describe("parseTaskRef", () => {
     expect(parseTaskRef("9356343951")).toBe("9356343951");
   });
 
-  it("accepts IDs with hyphens and underscores", () => {
-    expect(parseTaskRef("abc-def_123")).toBe("abc-def_123");
+  it("strips a slug prefix from a bare token, returning only the trailing ID", () => {
+    // Modern Todoist URLs use `<slug>-<id>` format. When users paste only
+    // the path tail (without the full URL) we still want to recover just
+    // the ID. Real Todoist IDs never contain hyphens.
+    expect(parseTaskRef("test-task-6gXXfXVrWJJQHRP6")).toBe("6gXXfXVrWJJQHRP6");
+    expect(parseTaskRef("read-the-book-6gQFRVf9fPC94PR9")).toBe("6gQFRVf9fPC94PR9");
   });
 
   it("trims surrounding whitespace", () => {
@@ -28,6 +32,23 @@ describe("parseTaskRef", () => {
     expect(parseTaskRef("https://www.todoist.com/app/task/6gQFRVf9fPC94PR9")).toBe(
       "6gQFRVf9fPC94PR9",
     );
+  });
+
+  it("extracts ID from a Todoist URL with app subdomain", () => {
+    expect(parseTaskRef("https://app.todoist.com/app/task/6gQFRVf9fPC94PR9")).toBe(
+      "6gQFRVf9fPC94PR9",
+    );
+  });
+
+  it("extracts ID from a slug-prefixed URL (modern format)", () => {
+    expect(parseTaskRef("https://app.todoist.com/app/task/test-task-6gXXfXVrWJJQHRP6")).toBe(
+      "6gXXfXVrWJJQHRP6",
+    );
+    expect(
+      parseTaskRef(
+        "https://todoist.com/app/task/connect-with-micole-re-acr-booklet-6gXJ663hXJv9C7gc",
+      ),
+    ).toBe("6gXJ663hXJv9C7gc");
   });
 
   it("extracts ID from a URL with trailing slash", () => {

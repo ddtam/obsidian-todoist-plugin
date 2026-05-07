@@ -226,6 +226,7 @@ export type Translations = {
     };
     contextMenu: {
       completeTaskLabel: string;
+      reopenTaskLabel: string;
       openTaskInAppLabel: string;
       openTaskInBrowserLabel: string;
     };

@@ -46,6 +46,10 @@ export class TodoistApiClient {
     await this.do(`/tasks/${id}/close`, "POST", {});
   }
 
+  public async reopenTask(id: TaskId): Promise<void> {
+    await this.do(`/tasks/${id}/reopen`, "POST", {});
+  }
+
   public async getUser(): Promise<UserInfo> {
     const response = await this.do("/user", "GET", {});
     return parseApiResponse(userInfoSchema, response.body);

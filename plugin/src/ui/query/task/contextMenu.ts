@@ -8,16 +8,28 @@ import type TodoistPlugin from "@/index";
 type TaskContext = {
   task: Task;
   plugin: TodoistPlugin;
+  // Optional: invoked after a successful complete/reopen via the menu.
+  // Single-task contexts (e.g. the badge) use this to refetch their state.
+  onAfterToggle?: () => void;
 };
 
 export function showTaskContext(ctx: TaskContext, position: Point) {
   const i18n = t().query.contextMenu;
+  const isCompleted = ctx.task.completedAt !== undefined;
+
   new Menu()
     .addItem((menuItem) =>
       menuItem
-        .setTitle(i18n.completeTaskLabel)
-        .setIcon("check-small")
-        .onClick(async () => await ctx.plugin.services.todoist.actions.closeTask(ctx.task.id)),
+        .setTitle(isCompleted ? i18n.reopenTaskLabel : i18n.completeTaskLabel)
+        .setIcon(isCompleted ? "rotate-ccw" : "check-small")
+        .onClick(async () => {
+          if (isCompleted) {
+            await ctx.plugin.services.todoist.actions.reopenTask(ctx.task.id);
+          } else {
+            await ctx.plugin.services.todoist.actions.closeTask(ctx.task.id);
+          }
+          ctx.onAfterToggle?.();
+        }),
     )
     .addItem((menuItem) =>
       menuItem

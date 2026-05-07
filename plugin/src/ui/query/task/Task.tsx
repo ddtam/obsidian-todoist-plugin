@@ -17,9 +17,15 @@ const noticeDurationMs = 2000;
 
 type Props = {
   tree: TaskTree;
+  // Called after a successful toggle of completion state (close or reopen).
+  // Used by single-task contexts (e.g. the task badge) that hold their own
+  // local state and need to refetch to reflect the new completion status.
+  // Query blocks rely on the SubscriptionManager removing the task from view
+  // on close instead, so they leave this unset.
+  onAfterToggle?: () => void;
 };
 
-export const Task: React.FC<Props> = ({ tree }) => {
+export const Task: React.FC<Props> = ({ tree, onAfterToggle }) => {
   const plugin = PluginContext.use();
   const query = QueryContext.use();
   const settings = useSettingsStore();
@@ -28,7 +34,7 @@ export const Task: React.FC<Props> = ({ tree }) => {
     ev.preventDefault();
     ev.stopPropagation();
     showTaskContext(
-      { task: tree, plugin },
+      { task: tree, plugin, onAfterToggle },
       {
         x: ev.pageX,
         y: ev.pageY,
@@ -36,17 +42,22 @@ export const Task: React.FC<Props> = ({ tree }) => {
     );
   };
 
+  const isCompleted = tree.completedAt !== undefined;
+  const isDisabled = tree.content.startsWith("*");
+
   const onClickTask = async () => {
     try {
-      await plugin.services.todoist.actions.closeTask(tree.id);
+      if (isCompleted) {
+        await plugin.services.todoist.actions.reopenTask(tree.id);
+      } else {
+        await plugin.services.todoist.actions.closeTask(tree.id);
+      }
+      onAfterToggle?.();
     } catch (error: unknown) {
-      console.error("Failed to close task", error);
+      console.error("Failed to toggle task completion", error);
       new Notice(t().query.failedCloseMessage, noticeDurationMs);
     }
   };
-
-  const isCompleted = tree.completedAt !== undefined;
-  const isDisabled = tree.content.startsWith("*") || isCompleted;
 
   const shouldRenderDescription =
     (query.show?.has("description") ?? true) && tree.description !== "";

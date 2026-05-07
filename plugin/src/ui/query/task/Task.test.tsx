@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MarkdownRenderChild, Notice } from "obsidian";
 import type React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TaskTree } from "@/data/transformations/relationships";
 import { makeDueDate, makeTask } from "@/factories/data";
@@ -50,12 +50,14 @@ vi.mock("motion/react-m", async () => {
 const { Task } = await import("./Task");
 
 const mockCloseTask = vi.fn();
+const mockReopenTask = vi.fn();
 
 const mockPlugin = {
   services: {
     todoist: {
       actions: {
         closeTask: mockCloseTask,
+        reopenTask: mockReopenTask,
       },
     },
   },
@@ -85,6 +87,12 @@ const TaskWrapper: React.FC<{
 };
 
 describe("Task", () => {
+  beforeEach(() => {
+    mockCloseTask.mockReset();
+    mockReopenTask.mockReset();
+    vi.mocked(Notice).mockReset();
+  });
+
   describe("content sanitization", () => {
     it("should render content unchanged when no special prefix", async () => {
       const tree = makeTree("1", { content: "Buy groceries" });
@@ -208,6 +216,98 @@ describe("Task", () => {
         expect(Notice).toHaveBeenCalledWith(expect.any(String), expect.any(Number));
       });
 
+      vi.restoreAllMocks();
+    });
+
+    it("should be clickable on a completed task (so it can be reopened)", () => {
+      const tree = makeTree("1", { content: "Done task" });
+      tree.completedAt = "2026-05-01T12:00:00Z";
+
+      const { container } = render(
+        <TaskWrapper>
+          <Task tree={tree} />
+        </TaskWrapper>,
+      );
+
+      const checkbox = container.querySelector("input[type='checkbox']");
+      expect(checkbox).not.toBeDisabled();
+    });
+
+    it("should call reopenTask (not closeTask) when clicking a completed task", async () => {
+      mockReopenTask.mockResolvedValueOnce(undefined);
+      const tree = makeTree("1", { content: "Done task" });
+      tree.completedAt = "2026-05-01T12:00:00Z";
+
+      const { container } = render(
+        <TaskWrapper>
+          <Task tree={tree} />
+        </TaskWrapper>,
+      );
+
+      const checkbox = container.querySelector("input[type='checkbox']");
+      fireEvent.click(checkbox as HTMLElement);
+
+      await waitFor(() => {
+        expect(mockReopenTask).toHaveBeenCalledWith("1");
+      });
+      expect(mockCloseTask).not.toHaveBeenCalled();
+    });
+
+    it("should fire onAfterToggle after a successful close", async () => {
+      mockCloseTask.mockResolvedValueOnce(undefined);
+      const onAfterToggle = vi.fn();
+      const tree = makeTree("1", { content: "Active task" });
+
+      const { container } = render(
+        <TaskWrapper>
+          <Task tree={tree} onAfterToggle={onAfterToggle} />
+        </TaskWrapper>,
+      );
+
+      fireEvent.click(container.querySelector("input[type='checkbox']") as HTMLElement);
+
+      await waitFor(() => {
+        expect(onAfterToggle).toHaveBeenCalled();
+      });
+    });
+
+    it("should fire onAfterToggle after a successful reopen", async () => {
+      mockReopenTask.mockResolvedValueOnce(undefined);
+      const onAfterToggle = vi.fn();
+      const tree = makeTree("1", { content: "Done task" });
+      tree.completedAt = "2026-05-01T12:00:00Z";
+
+      const { container } = render(
+        <TaskWrapper>
+          <Task tree={tree} onAfterToggle={onAfterToggle} />
+        </TaskWrapper>,
+      );
+
+      fireEvent.click(container.querySelector("input[type='checkbox']") as HTMLElement);
+
+      await waitFor(() => {
+        expect(onAfterToggle).toHaveBeenCalled();
+      });
+    });
+
+    it("should NOT fire onAfterToggle if the action fails", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      mockCloseTask.mockRejectedValueOnce(new Error("network error"));
+      const onAfterToggle = vi.fn();
+      const tree = makeTree("1", { content: "Active task" });
+
+      const { container } = render(
+        <TaskWrapper>
+          <Task tree={tree} onAfterToggle={onAfterToggle} />
+        </TaskWrapper>,
+      );
+
+      fireEvent.click(container.querySelector("input[type='checkbox']") as HTMLElement);
+
+      await waitFor(() => {
+        expect(Notice).toHaveBeenCalled();
+      });
+      expect(onAfterToggle).not.toHaveBeenCalled();
       vi.restoreAllMocks();
     });
   });

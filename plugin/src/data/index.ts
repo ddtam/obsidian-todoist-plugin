@@ -27,6 +27,13 @@ export type { OnSubscriptionChange, Refresh, SubscriptionResult } from "@/data/s
 export class TodoistAdapter {
   public actions = {
     closeTask: async (id: TaskId) => await this.closeTask(id),
+    reopenTask: async (id: TaskId) => {
+      // No subscription gymnastics: reopening doesn't remove a task from
+      // any visible list (no SubscriptionResult shows completed tasks).
+      // Callers that surface completed tasks (e.g. the task badge) refetch
+      // their own state via the onAfterToggle callback on Task.
+      await this.api.withInner((api) => api.reopenTask(id));
+    },
     createTask: async (content: string, params: CreateTaskParams): Promise<ApiTask> =>
       await this.api.withInner((api) => api.createTask(content, params)),
     getTask: async (id: TaskId): Promise<Task | undefined> => {
@@ -156,7 +163,7 @@ export class TodoistAdapter {
     }
 
     try {
-      this.api.withInner((api) => api.closeTask(id));
+      await this.api.withInner((api) => api.closeTask(id));
       this.tasksPendingClose.remove(id);
 
       for (const subscription of this.subscriptions.list()) {
