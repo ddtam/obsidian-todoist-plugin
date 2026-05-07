@@ -16,7 +16,9 @@ import {
   type UnsubscribeCallback,
 } from "@/data/subscriptions";
 import type { Task } from "@/data/task";
+import { timezone } from "@/infra/time";
 import type { TaskQuery } from "@/query/schema/tasks";
+import { rewriteFilterDates } from "@/utils/filterDates";
 import { Maybe } from "@/utils/maybe";
 
 export { QueryErrorKind } from "@/data/errors";
@@ -140,7 +142,8 @@ export class TodoistAdapter {
       if (!this.api.hasValue()) {
         return undefined;
       }
-      const data = await this.api.withInner((api) => api.getTasks(query.filter));
+      const filter = rewriteFilterDates(query.filter, timezone());
+      const data = await this.api.withInner((api) => api.getTasks(filter));
       return data.map((t) => hydrate(t, this.data()));
     };
   }
