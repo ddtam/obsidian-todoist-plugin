@@ -30,6 +30,11 @@ export const TaskBadge: React.FC<Props> = ({ query }) => {
   const [state, setState] = useState<State>({ kind: "loading" });
 
   const fetchTask = useCallback(async () => {
+    if (!plugin.services.todoist.isReady()) {
+      // Adapter still wiring up post-reload. Stay in loading; the
+      // ready-poll effect below will retry once the initial sync is done.
+      return;
+    }
     try {
       const task = await plugin.services.todoist.actions.getTask(query.id);
       setState(task === undefined ? { kind: "not-found" } : { kind: "ready", task });
@@ -39,9 +44,23 @@ export const TaskBadge: React.FC<Props> = ({ query }) => {
     }
   }, [plugin, query.id]);
 
+  // Initial fetch — if the plugin hasn't finished its first sync yet
+  // (common right after Obsidian reloads a plugin), poll briefly until
+  // it's ready instead of flashing "task not found."
   useEffect(() => {
-    fetchTask();
-  }, [fetchTask]);
+    if (plugin.services.todoist.isReady()) {
+      fetchTask();
+      return;
+    }
+    const READY_POLL_INTERVAL_MS = 250;
+    const id = window.setInterval(() => {
+      if (plugin.services.todoist.isReady()) {
+        window.clearInterval(id);
+        fetchTask();
+      }
+    }, READY_POLL_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [plugin, fetchTask]);
 
   useEffect(() => {
     if (query.autorefresh === undefined || query.autorefresh === 0) {
