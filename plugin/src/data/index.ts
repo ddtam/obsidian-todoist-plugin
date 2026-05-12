@@ -9,6 +9,7 @@ import type { CachedSync } from "@/data/cache";
 import { mapApiError } from "@/data/errors";
 import { type DataAccessor, hydrate } from "@/data/hydrate";
 import { Repository } from "@/data/repository";
+import { SeenTaskRepository } from "@/data/seenTaskRepository";
 import {
   type OnSubscriptionChange,
   type Refresh,
@@ -39,16 +40,23 @@ export class TodoistAdapter {
     createTask: async (content: string, params: CreateTaskParams): Promise<ApiTask> =>
       await this.api.withInner((api) => api.createTask(content, params)),
     getTask: async (id: TaskId): Promise<Task | undefined> => {
-      // Try the local sync cache first — instant, works offline. Sync covers
-      // active tasks; completed tasks are never in the cache.
+      // Three-layer lookup: active sync cache → seen-task cache → API.
+      // Sync covers active tasks; the seen-task cache holds individually
+      // fetched tasks (typically completed) so they survive plugin reload
+      // and work offline once seen.
       const cached = this.tasks.byId(id);
       if (cached !== undefined) {
         return hydrate(cached, this.data());
+      }
+      const seen = this.seenTasks.byId(id);
+      if (seen !== undefined) {
+        return hydrate(seen, this.data());
       }
       if (!this.api.hasValue()) {
         return undefined;
       }
       const apiTask = await this.api.withInner((api) => api.getTaskById(id));
+      this.seenTasks.record(apiTask);
       return hydrate(apiTask, this.data());
     },
     fetchActiveTasks: async (): Promise<Task[]> => {
@@ -65,6 +73,7 @@ export class TodoistAdapter {
   private readonly sections: Repository<SectionId, Section>;
   private readonly labels: Repository<LabelId, Label>;
   private readonly tasks: TaskRepository;
+  private readonly seenTasks: SeenTaskRepository;
   private readonly subscriptions: SubscriptionManager<Subscription>;
 
   private readonly tasksPendingClose: TaskId[];
@@ -78,6 +87,7 @@ export class TodoistAdapter {
     this.sections = new Repository<SectionId, Section>();
     this.labels = new Repository<LabelId, Label>();
     this.tasks = new TaskRepository();
+    this.seenTasks = new SeenTaskRepository();
     this.subscriptions = new SubscriptionManager<Subscription>();
     this.tasksPendingClose = [];
   }
@@ -156,6 +166,7 @@ export class TodoistAdapter {
       projects: [...this.projects.iter()],
       sections: [...this.sections.iter()],
       labels: [...this.labels.iter()],
+      seenTasks: [...this.seenTasks.iter()],
       savedAt: new Date().toISOString(),
     };
   }
@@ -170,6 +181,7 @@ export class TodoistAdapter {
     this.sections.applyDiff(cache.sections);
     this.labels.applyDiff(cache.labels);
     this.tasks.applyDiff(cache.tasks);
+    this.seenTasks.restore(cache.seenTasks);
   }
 
   public subscribe(

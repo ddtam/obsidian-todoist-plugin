@@ -22,6 +22,11 @@ export const cachedSyncSchema = z.object({
   projects: z.array(projectSchema),
   sections: z.array(sectionSchema),
   labels: z.array(labelSchema),
+  // Bounded LRU of tasks fetched via GET /tasks/{id} that aren't in the
+  // active sync set (typically completed tasks). Lets completed badges
+  // render instantly on reload and work offline once seen. Defaulted so
+  // pre-feature cache.json files load cleanly without forcing a re-sync.
+  seenTasks: z.array(taskSchema).default([]),
   // Wall-clock at the moment we saved. Lets us show "last synced N minutes
   // ago" to the user; not used for any reconciliation logic.
   savedAt: z.string(),

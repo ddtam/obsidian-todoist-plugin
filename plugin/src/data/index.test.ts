@@ -144,6 +144,20 @@ describe("TodoistAdapter", () => {
       expect(task?.content).toBe("Fresh fetch");
     });
 
+    it("serves a subsequent lookup from the seen-task cache without another API call", async () => {
+      vi.mocked(mockApi.getTaskById).mockResolvedValue(
+        makeApiTask({ id: "completed-1", content: "Completed" }),
+      );
+      await adapter.initialize(mockApi);
+
+      const first = await adapter.actions.getTask("completed-1");
+      const second = await adapter.actions.getTask("completed-1");
+
+      expect(first?.content).toBe("Completed");
+      expect(second?.content).toBe("Completed");
+      expect(mockApi.getTaskById).toHaveBeenCalledTimes(1);
+    });
+
     it("returns undefined when API client is not initialized AND cache is empty", async () => {
       const task = await adapter.actions.getTask("abc-123");
       expect(task).toBeUndefined();
@@ -177,6 +191,24 @@ describe("TodoistAdapter", () => {
       expect((await restored.actions.getTask("t2"))?.content).toBe("Task two");
       // Sanity: no API was injected, so a cache miss would surface as undefined.
       expect(await restored.actions.getTask("never-existed")).toBeUndefined();
+    });
+
+    it("round-trips the seen-task cache so completed badges survive reload offline", async () => {
+      vi.mocked(mockApi.getTaskById).mockResolvedValue(
+        makeApiTask({ id: "done-1", content: "Already done" }),
+      );
+      await adapter.initialize(mockApi);
+      await adapter.actions.getTask("done-1");
+
+      const dumped = adapter.dumpCache();
+      expect(dumped.seenTasks.map((t) => t.id)).toEqual(["done-1"]);
+
+      // Restore into a fresh adapter with no API attached — must still serve
+      // the previously-seen task from cache, simulating an offline reload.
+      const restored = new TodoistAdapter();
+      restored.restoreCache(dumped);
+
+      expect((await restored.actions.getTask("done-1"))?.content).toBe("Already done");
     });
 
     it("excludes deleted tasks from the dump", async () => {
