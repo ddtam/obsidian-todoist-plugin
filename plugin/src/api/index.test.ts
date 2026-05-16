@@ -237,6 +237,108 @@ describe("TodoistApiClient", () => {
     });
   });
 
+  describe("updateTask", () => {
+    it("POSTs to /tasks/{id} and snakifies the body", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce({
+        statusCode: 200,
+        body: JSON.stringify(makeTask({ id: "task-1", priority: 4 })),
+      });
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      const task = await client.updateTask("task-1", {
+        priority: 4,
+        dueString: "tomorrow",
+        deadlineDate: "2026-06-01",
+      });
+
+      expect(task.priority).toBe(4);
+
+      const call = fetcher.fetch.mock.calls[0][0];
+      expect(call.method).toBe("POST");
+      expect(parseUrl(call.url).pathname).toBe("/api/v1/tasks/task-1");
+      const body = JSON.parse(call.body as string);
+      expect(body).toEqual({
+        priority: 4,
+        due_string: "tomorrow",
+        deadline_date: "2026-06-01",
+      });
+    });
+
+    it("preserves explicit nulls so callers can clear due / deadline", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce({
+        statusCode: 200,
+        body: JSON.stringify(makeTask({ due: null, deadline: null })),
+      });
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      await client.updateTask("task-1", { due: null, deadlineDate: null });
+
+      const body = JSON.parse(fetcher.fetch.mock.calls[0][0].body as string);
+      expect(body.due).toBeNull();
+      expect(body.deadline_date).toBeNull();
+    });
+  });
+
+  describe("moveTask", () => {
+    it("POSTs to /sync with an item_move command and accepts ok status", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce({
+        statusCode: 200,
+        body: JSON.stringify({ sync_status: { "any-uuid": "ok" } }),
+      });
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      await client.moveTask("task-1", { projectId: "proj-new" });
+
+      const call = fetcher.fetch.mock.calls[0][0];
+      expect(call.method).toBe("POST");
+      expect(parseUrl(call.url).pathname).toBe("/api/v1/sync");
+      const body = JSON.parse(call.body as string);
+      expect(body.commands).toHaveLength(1);
+      expect(body.commands[0].type).toBe("item_move");
+      expect(body.commands[0].args).toEqual({ id: "task-1", project_id: "proj-new" });
+      expect(typeof body.commands[0].uuid).toBe("string");
+    });
+
+    it("prefers section_id over project_id when both are provided", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce({
+        statusCode: 200,
+        body: JSON.stringify({ sync_status: { "any-uuid": "ok" } }),
+      });
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      await client.moveTask("task-1", { projectId: "proj-new", sectionId: "sec-1" });
+
+      const body = JSON.parse(fetcher.fetch.mock.calls[0][0].body as string);
+      expect(body.commands[0].args).toEqual({ id: "task-1", section_id: "sec-1" });
+    });
+
+    it("rejects when sync_status is not ok", async () => {
+      const fetcher = makeFetcher();
+      fetcher.fetch.mockResolvedValueOnce({
+        statusCode: 200,
+        body: JSON.stringify({
+          sync_status: { "any-uuid": { error: "INVALID_PROJECT", http_code: 400 } },
+        }),
+      });
+
+      const client = new TodoistApiClient("test-token", fetcher);
+      await expect(client.moveTask("task-1", { projectId: "bad" })).rejects.toThrow(
+        /item_move failed/,
+      );
+    });
+
+    it("throws when neither projectId nor sectionId is provided", async () => {
+      const fetcher = makeFetcher();
+      const client = new TodoistApiClient("test-token", fetcher);
+      await expect(client.moveTask("task-1", {})).rejects.toThrow(/requires/);
+      expect(fetcher.fetch).not.toHaveBeenCalled();
+    });
+  });
+
   describe("closeTask", () => {
     it("sends POST to /tasks/{id}/close without body or Content-Type", async () => {
       const fetcher = makeFetcher();

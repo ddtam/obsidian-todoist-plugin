@@ -36,6 +36,13 @@ export class SeenTaskRepository {
     return this.data.get(id);
   }
 
+  // Drop an entry by id. Used after a mutation that flips the task back
+  // into the active set (e.g. reopen) so the next read falls through to
+  // the API instead of returning the stale "completed" snapshot.
+  public remove(id: TaskId): void {
+    this.data.delete(id);
+  }
+
   public iter(): IterableIterator<ApiTask> {
     return this.data.values();
   }

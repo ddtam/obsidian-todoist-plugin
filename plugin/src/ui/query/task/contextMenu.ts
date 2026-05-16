@@ -8,8 +8,8 @@ import type TodoistPlugin from "@/index";
 type TaskContext = {
   task: Task;
   plugin: TodoistPlugin;
-  // Optional: invoked after a successful complete/reopen via the menu.
-  // Single-task contexts (e.g. the badge) use this to refetch their state.
+  // Optional: invoked after a successful complete/reopen or edit via the
+  // menu. Single-task contexts (e.g. the badge) use this to refetch state.
   onAfterToggle?: () => void;
 };
 
@@ -29,6 +29,17 @@ export function showTaskContext(ctx: TaskContext, position: Point) {
             await ctx.plugin.services.todoist.actions.closeTask(ctx.task.id);
           }
           ctx.onAfterToggle?.();
+        }),
+    )
+    .addItem((menuItem) =>
+      menuItem
+        .setTitle(i18n.editTaskLabel)
+        .setIcon("pencil")
+        .onClick(() => {
+          ctx.plugin.services.modals.taskEdit({
+            task: ctx.task,
+            onAfterSave: ctx.onAfterToggle,
+          });
         }),
     )
     .addItem((menuItem) =>

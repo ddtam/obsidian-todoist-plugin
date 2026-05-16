@@ -191,6 +191,14 @@ export type Translations = {
       doNotAddLink: string;
     };
   };
+  editTaskModal: {
+    title: string;
+    saveButtonLabel: string;
+    cancelButtonLabel: string;
+    successNotice: string;
+    errorNotice: string;
+    loadingMessage: string;
+  };
   onboardingModal: {
     failureNoticeMessage: string;
     explainer: string;
@@ -228,6 +236,7 @@ export type Translations = {
     contextMenu: {
       completeTaskLabel: string;
       reopenTaskLabel: string;
+      editTaskLabel: string;
       openTaskInAppLabel: string;
       openTaskInBrowserLabel: string;
     };

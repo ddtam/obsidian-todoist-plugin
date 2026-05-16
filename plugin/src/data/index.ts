@@ -3,7 +3,13 @@ import type { Label, LabelId } from "@/api/domain/label";
 import type { Project, ProjectId } from "@/api/domain/project";
 import type { Section, SectionId } from "@/api/domain/section";
 import type { SyncToken } from "@/api/domain/sync";
-import type { Task as ApiTask, CreateTaskParams, TaskId } from "@/api/domain/task";
+import type {
+  Task as ApiTask,
+  CreateTaskParams,
+  MoveTaskTarget,
+  TaskId,
+  UpdateTaskParams,
+} from "@/api/domain/task";
 import type { UserInfo } from "@/api/domain/user";
 import type { CachedSync } from "@/data/cache";
 import { mapApiError } from "@/data/errors";
@@ -36,9 +42,46 @@ export class TodoistAdapter {
       // Callers that surface completed tasks (e.g. the task badge) refetch
       // their own state via the onAfterToggle callback on Task.
       await this.api.withInner((api) => api.reopenTask(id));
+      // Drop the stale "completed" snapshot from the seen-task cache so
+      // the next badge refresh falls through to the API and rehydrates
+      // the active state.
+      this.seenTasks.remove(id);
     },
     createTask: async (content: string, params: CreateTaskParams): Promise<ApiTask> =>
       await this.api.withInner((api) => api.createTask(content, params)),
+    updateTask: async (id: TaskId, params: UpdateTaskParams): Promise<Task> => {
+      if (!this.api.hasValue()) {
+        throw new Error("Cannot update task before the Todoist API is initialized");
+      }
+      const apiTask = await this.api.withInner((api) => api.updateTask(id, params));
+      this.applyTaskUpdate(id, apiTask);
+      // Active subscriptions may need refetching: filter membership can
+      // change (e.g. priority/due edits move a task in or out of "today").
+      if (this.tasks.byId(id) !== undefined) {
+        for (const subscription of this.subscriptions.list()) {
+          await subscription.update();
+        }
+      }
+      return hydrate(apiTask, this.data());
+    },
+    // Project/section moves require the sync API's `item_move` command —
+    // REST POST /tasks/{id} rejects project_id. After the move succeeds we
+    // refetch via /tasks/{id} so we have authoritative state to feed back
+    // into the caches.
+    moveTask: async (id: TaskId, target: MoveTaskTarget): Promise<Task> => {
+      if (!this.api.hasValue()) {
+        throw new Error("Cannot move task before the Todoist API is initialized");
+      }
+      await this.api.withInner((api) => api.moveTask(id, target));
+      const apiTask = await this.api.withInner((api) => api.getTaskById(id));
+      this.applyTaskUpdate(id, apiTask);
+      // A project move can change filter membership for queries like
+      // `#oldproject` or `#newproject`; refresh to keep results accurate.
+      for (const subscription of this.subscriptions.list()) {
+        await subscription.update();
+      }
+      return hydrate(apiTask, this.data());
+    },
     getTask: async (id: TaskId): Promise<Task | undefined> => {
       // Three-layer lookup: active sync cache → seen-task cache → API.
       // Sync covers active tasks; the seen-task cache holds individually
@@ -204,6 +247,19 @@ export class TodoistAdapter {
     };
   }
 
+  // Route a freshly-fetched task into whichever cache currently holds it.
+  // Active sync cache wins (it's authoritative for filter queries); the
+  // seen-task cache is used for badges of tasks the active sync doesn't
+  // surface (typically completed). If neither knows about it, do nothing —
+  // we don't speculatively promote unrelated tasks into the active set.
+  private applyTaskUpdate(id: TaskId, apiTask: ApiTask): void {
+    if (this.tasks.byId(id) !== undefined) {
+      this.tasks.applyDiff([apiTask]);
+    } else if (this.seenTasks.byId(id) !== undefined) {
+      this.seenTasks.record(apiTask);
+    }
+  }
+
   private async closeTask(id: TaskId): Promise<void> {
     this.tasksPendingClose.push(id);
 
@@ -214,6 +270,9 @@ export class TodoistAdapter {
     try {
       await this.api.withInner((api) => api.closeTask(id));
       this.tasksPendingClose.remove(id);
+      // Drop the stale active-cache entry so a badge refresh for this id
+      // falls through to the API and picks up the completed state.
+      this.tasks.remove(id);
 
       for (const subscription of this.subscriptions.list()) {
         subscription.remove(id);

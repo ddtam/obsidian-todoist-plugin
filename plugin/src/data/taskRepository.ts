@@ -24,6 +24,13 @@ export class TaskRepository {
     return this.data.get(id);
   }
 
+  // Drop a task by id. Used after a mutation that flips the task out of
+  // the active set (e.g. close) so the next read falls through to the API
+  // instead of returning the stale cached entry.
+  public remove(id: TaskId): void {
+    this.data.delete(id);
+  }
+
   public iter(): IterableIterator<ApiTask> {
     return this.data.values();
   }

@@ -19,3 +19,12 @@ export const syncResponseSchema = z.object({
 });
 
 export type SyncResponse = z.infer<typeof syncResponseSchema>;
+
+// POST /sync with a `commands` array returns a sync_status map keyed by the
+// command's uuid. "ok" means success; any other value (an error object) is
+// a failure for that command.
+export const syncCommandResponseSchema = z.object({
+  syncStatus: z.record(z.string(), z.union([z.literal("ok"), z.unknown()])),
+});
+
+export type SyncCommandResponse = z.infer<typeof syncCommandResponseSchema>;

@@ -209,6 +209,14 @@ export const en: Translations = {
       doNotAddLink: "Do not add link",
     },
   },
+  editTaskModal: {
+    title: "Edit task",
+    saveButtonLabel: "Save",
+    cancelButtonLabel: "Cancel",
+    successNotice: "Task updated",
+    errorNotice: "Failed to update task",
+    loadingMessage: "Loading...",
+  },
   onboardingModal: {
     failureNoticeMessage: "Failed to save API token",
     explainer:
@@ -253,6 +261,7 @@ export const en: Translations = {
     contextMenu: {
       completeTaskLabel: "Complete task",
       reopenTaskLabel: "Reopen task",
+      editTaskLabel: "Edit task…",
       openTaskInAppLabel: "Open task in Todoist (app)",
       openTaskInBrowserLabel: "Open task in Todoist (web)",
     },

@@ -68,3 +68,28 @@ export const createTaskParamsSchema = z.object({
   deadlineDate: z.string().optional(),
 });
 export type CreateTaskParams = z.infer<typeof createTaskParamsSchema>;
+
+// Partial-update payload for POST /tasks/{id}. Fields the caller omits are
+// left unchanged on the server. To clear due, pass `due: null`. To clear
+// deadline, pass `deadlineDate: null`. Send exactly one of dueString /
+// dueDate / dueDatetime when setting due. Project moves are NOT supported
+// by this endpoint — use the sync `item_move` command via `moveTask`.
+export const updateTaskParamsSchema = z.object({
+  content: z.string().optional(),
+  description: z.string().optional(),
+  priority: prioritySchema.optional(),
+  dueString: z.string().optional(),
+  dueDate: z.string().optional(),
+  dueDatetime: z.string().optional(),
+  due: z.null().optional(),
+  deadlineDate: z.string().nullable().optional(),
+});
+export type UpdateTaskParams = z.infer<typeof updateTaskParamsSchema>;
+
+// Target for a sync `item_move` command. Section_id implies project_id on
+// the server side, but the sync API accepts either form.
+export const moveTaskTargetSchema = z.object({
+  projectId: projectIdSchema.optional(),
+  sectionId: sectionIdSchema.optional(),
+});
+export type MoveTaskTarget = z.infer<typeof moveTaskTargetSchema>;

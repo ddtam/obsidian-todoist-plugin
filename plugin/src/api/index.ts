@@ -2,8 +2,14 @@ import snakify from "snakify-ts";
 import { z } from "zod";
 
 import type { SyncResponse, SyncToken } from "@/api/domain/sync";
-import { syncResponseSchema } from "@/api/domain/sync";
-import type { CreateTaskParams, Task, TaskId } from "@/api/domain/task";
+import { syncCommandResponseSchema, syncResponseSchema } from "@/api/domain/sync";
+import type {
+  CreateTaskParams,
+  MoveTaskTarget,
+  Task,
+  TaskId,
+  UpdateTaskParams,
+} from "@/api/domain/task";
 import { taskSchema } from "@/api/domain/task";
 import type { UserInfo } from "@/api/domain/user";
 import { userInfoSchema } from "@/api/domain/user";
@@ -44,6 +50,38 @@ export class TodoistApiClient {
 
   public async closeTask(id: TaskId): Promise<void> {
     await this.do(`/tasks/${id}/close`, "POST", {});
+  }
+
+  public async updateTask(id: TaskId, params: UpdateTaskParams): Promise<Task> {
+    const body = snakify(params);
+    const response = await this.do(`/tasks/${id}`, "POST", { json: body });
+    return parseApiResponse(taskSchema, response.body);
+  }
+
+  // REST POST /tasks/{id} rejects project_id; project/section moves go
+  // through the sync API's `item_move` command instead. We treat the
+  // sync_status as the success signal and let the caller refetch state.
+  public async moveTask(id: TaskId, target: MoveTaskTarget): Promise<void> {
+    const args: Record<string, string> = { id };
+    if (target.sectionId !== undefined) {
+      args.section_id = target.sectionId;
+    } else if (target.projectId !== undefined) {
+      args.project_id = target.projectId;
+    } else {
+      throw new Error("moveTask requires either projectId or sectionId");
+    }
+    const body = {
+      commands: [{ type: "item_move", uuid: crypto.randomUUID(), args }],
+    };
+    const response = await this.do("/sync", "POST", { json: body });
+    const parsed = parseApiResponse(syncCommandResponseSchema, response.body);
+    // We send exactly one command so we only care about that command's
+    // status. Look up by-uuid is unreliable: parseApiResponse runs the body
+    // through camelize, which mangles uuid keys (hyphens).
+    const statuses = Object.values(parsed.syncStatus);
+    if (statuses.length !== 1 || statuses[0] !== "ok") {
+      throw new Error(`item_move failed: ${JSON.stringify(statuses[0])}`);
+    }
   }
 
   public async reopenTask(id: TaskId): Promise<void> {
