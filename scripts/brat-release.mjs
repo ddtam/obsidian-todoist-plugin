@@ -115,7 +115,10 @@ if (userNotes !== undefined) {
 } else {
   try {
     execSync(`git fetch ${forkRemote} --tags --quiet`, { cwd: root });
-    const log = execSync(`git log --pretty=format:- %s ${previousVersion}..HEAD`, {
+    // Single-quote the format string so the shell hands git one argument
+    // ("format:- %s") instead of splitting on the space — otherwise git
+    // sees "%s" as a separate arg and rejects it as an ambiguous revision.
+    const log = execSync(`git log --pretty='format:- %s' ${previousVersion}..HEAD`, {
       cwd: root,
     })
       .toString()
