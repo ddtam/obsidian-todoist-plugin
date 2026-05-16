@@ -19,6 +19,16 @@
       background-color: unset;
       box-shadow: none;
     }
+
+    // Mobile-only: Obsidian renders modals as rounded sheets with very
+    // little internal padding, so wrapped text on the first/last lines
+    // gets clipped by the sheet's corner curve. box-sizing keeps the
+    // textarea within its parent; padding insets the text away from the
+    // curve. Desktop modals have enough chrome that this isn't needed.
+    body.is-mobile & {
+      box-sizing: border-box;
+      padding: 0 12px;
+    }
   }
 
   .task-name textarea {
