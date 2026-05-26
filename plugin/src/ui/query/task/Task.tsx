@@ -3,6 +3,7 @@ import { Notice } from "obsidian";
 import React, { type MouseEvent } from "react";
 import { Checkbox } from "react-aria-components";
 
+import { Deadline } from "@/data/deadline";
 import { DueDate } from "@/data/dueDate";
 import type { TaskTree } from "@/data/transformations/relationships";
 import { t } from "@/i18n";
@@ -71,6 +72,7 @@ export const Task: React.FC<Props> = ({ tree, onAfterToggle }) => {
         onContextMenu={onContextMenu}
         data-priority={tree.priority}
         data-due-metadata={getDueMetadataInfo(tree)}
+        data-deadline-metadata={getDeadlineMetadataInfo(tree)}
         data-has-time={getTimeMetadataInfo(tree)}
         data-completed={isCompleted}
         initial={{
@@ -121,6 +123,20 @@ function getDueMetadataInfo(task: TaskTree): string | undefined {
   }
 
   return info.start.flag;
+}
+
+function getDeadlineMetadataInfo(task: TaskTree): string | undefined {
+  if (task.deadline === undefined) {
+    return undefined;
+  }
+
+  const info = Deadline.parse(task.deadline);
+
+  if (info.isOverdue) {
+    return "overdue";
+  }
+
+  return info.flag;
 }
 
 function getTimeMetadataInfo(task: TaskTree): boolean | undefined {

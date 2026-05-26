@@ -445,6 +445,53 @@ describe("Task", () => {
       expect(taskContainer).toHaveAttribute("data-due-metadata", "overdue");
     });
 
+    it("should omit data-deadline-metadata when no deadline", () => {
+      const tree = makeTree("1", { content: "No deadline" });
+
+      const { container } = render(
+        <TaskWrapper>
+          <Task tree={tree} />
+        </TaskWrapper>,
+      );
+
+      const taskContainer = container.querySelector(".todoist-task-container");
+      expect(taskContainer).not.toHaveAttribute("data-deadline-metadata");
+    });
+
+    it("should set data-deadline-metadata to 'today' for deadline today", () => {
+      const today = new Date();
+      const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      const tree = makeTree("1", {
+        content: "Deadline today",
+        deadline: { date: dateStr },
+      });
+
+      const { container } = render(
+        <TaskWrapper>
+          <Task tree={tree} />
+        </TaskWrapper>,
+      );
+
+      const taskContainer = container.querySelector(".todoist-task-container");
+      expect(taskContainer).toHaveAttribute("data-deadline-metadata", "today");
+    });
+
+    it("should set data-deadline-metadata to 'overdue' for past deadline", () => {
+      const tree = makeTree("1", {
+        content: "Overdue deadline",
+        deadline: { date: "2020-01-01" },
+      });
+
+      const { container } = render(
+        <TaskWrapper>
+          <Task tree={tree} />
+        </TaskWrapper>,
+      );
+
+      const taskContainer = container.querySelector(".todoist-task-container");
+      expect(taskContainer).toHaveAttribute("data-deadline-metadata", "overdue");
+    });
+
     it("should omit data-has-time when no due date", () => {
       const tree = makeTree("1", { content: "No due" });
 

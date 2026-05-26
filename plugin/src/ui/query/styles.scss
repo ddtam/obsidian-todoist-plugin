@@ -197,9 +197,39 @@
     }
   }
 
-  &[data-due-metadata="overdue"] {
-    .task-metadata-item[data-task-metadata-kind="due"] {
-      color: var(--todoist-red);
+  // Active-task due/deadline coloring mirrors Todoist's convention. The
+  // completed-task override below collapses these to a muted shade since
+  // a completed task's dates are reference, not urgency.
+  &[data-due-metadata="overdue"] .task-metadata-item[data-task-metadata-kind="due"] {
+    color: var(--todoist-red);
+  }
+  &[data-due-metadata="today"] .task-metadata-item[data-task-metadata-kind="due"] {
+    color: var(--todoist-green);
+  }
+  &[data-due-metadata="tomorrow"] .task-metadata-item[data-task-metadata-kind="due"] {
+    color: var(--todoist-orange);
+  }
+  &[data-due-metadata="nextWeek"] .task-metadata-item[data-task-metadata-kind="due"] {
+    color: var(--todoist-violet);
+  }
+
+  &[data-deadline-metadata="overdue"] .task-metadata-item[data-task-metadata-kind="deadline"] {
+    color: var(--todoist-red);
+  }
+  &[data-deadline-metadata="today"] .task-metadata-item[data-task-metadata-kind="deadline"] {
+    color: var(--todoist-green);
+  }
+  &[data-deadline-metadata="tomorrow"] .task-metadata-item[data-task-metadata-kind="deadline"] {
+    color: var(--todoist-orange);
+  }
+  &[data-deadline-metadata="nextWeek"] .task-metadata-item[data-task-metadata-kind="deadline"] {
+    color: var(--todoist-violet);
+  }
+
+  &[data-completed="true"] {
+    .task-metadata-item[data-task-metadata-kind="due"],
+    .task-metadata-item[data-task-metadata-kind="deadline"] {
+      color: var(--text-muted);
     }
   }
 }
