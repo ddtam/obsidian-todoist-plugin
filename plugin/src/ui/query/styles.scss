@@ -210,7 +210,7 @@
     color: var(--todoist-orange);
   }
   &[data-due-metadata="nextWeek"] .task-metadata-item[data-task-metadata-kind="due"] {
-    color: var(--todoist-violet);
+    color: #9159ab;
   }
 
   &[data-deadline-metadata="overdue"] .task-metadata-item[data-task-metadata-kind="deadline"] {
@@ -223,7 +223,7 @@
     color: var(--todoist-orange);
   }
   &[data-deadline-metadata="nextWeek"] .task-metadata-item[data-task-metadata-kind="deadline"] {
-    color: var(--todoist-violet);
+    color: #9159ab;
   }
 
   &[data-completed="true"] {
