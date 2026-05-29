@@ -1,9 +1,12 @@
-import { MarkdownView, type TFile } from "obsidian";
+import { MarkdownView, Notice, type TFile } from "obsidian";
 
 import type { MakeCommand } from "@/commands";
 import type { Translations } from "@/i18n/translation";
 import type TodoistPlugin from "@/index";
 import type { TaskCreationOptions } from "@/ui/createTaskModal";
+import { buildTaskRefCodeBlock } from "@/ui/insertTaskRefModal/helpers";
+
+const NOTICE_DURATION_MS = 4000;
 
 export const addTask: MakeCommand = (plugin: TodoistPlugin, i18n: Translations["commands"]) => {
   return {
@@ -35,6 +38,31 @@ export const addTaskWithPageInDescription: MakeCommand = (
     callback: makeCallback(plugin, {
       appendLinkTo: "description",
     }),
+  };
+};
+
+export const addTaskAndInsertRef: MakeCommand = (
+  plugin: TodoistPlugin,
+  i18n: Translations["commands"],
+) => {
+  return {
+    name: i18n.addTaskInsertRef,
+    callback: () => {
+      const editor = plugin.app.workspace.getActiveViewOfType(MarkdownView)?.editor;
+      if (editor === undefined) {
+        new Notice(i18n.insertTaskRefNoEditorNotice, NOTICE_DURATION_MS);
+        return;
+      }
+
+      plugin.services.modals.taskCreation({
+        initialContent: editor.getSelection(),
+        fileContext: getFileContext(plugin),
+        options: {},
+        onTaskCreated: (task) => {
+          editor.replaceSelection(buildTaskRefCodeBlock(task.id));
+        },
+      });
+    },
   };
 };
 

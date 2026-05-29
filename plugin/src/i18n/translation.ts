@@ -237,8 +237,16 @@ export type Translations = {
       completeTaskLabel: string;
       reopenTaskLabel: string;
       editTaskLabel: string;
+      setDueTodayLabel: string;
+      setDueTodaySuccessNotice: string;
+      setDueTodayErrorNotice: string;
+      findReferencesLabel: string;
       openTaskInAppLabel: string;
       openTaskInBrowserLabel: string;
+    };
+    referencesModal: {
+      placeholder: string;
+      emptyState: string;
     };
     failedCloseMessage: string;
     header: {
@@ -265,6 +273,7 @@ export type Translations = {
     addTask: string;
     addTaskPageContent: string;
     addTaskPageDescription: string;
+    addTaskInsertRef: string;
     insertTaskRef: string;
     insertTaskRefNoEditorNotice: string;
     insertTaskRefModal: {

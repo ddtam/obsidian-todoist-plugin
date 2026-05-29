@@ -56,6 +56,10 @@ type CreateTaskProps = {
   initialContent: string;
   fileContext: TFile | undefined;
   options: TaskCreationOptions;
+  // Invoked once after a task is successfully created, regardless of which
+  // add action fired. Used by the "add task and insert reference" command to
+  // drop a task-ref callout into the active editor.
+  onTaskCreated?: (task: { id: string }) => void;
 };
 
 const getLinkDestinationMessage = (
@@ -174,6 +178,7 @@ const CreateTaskModalContent: React.FC<CreateTaskProps> = ({
   initialContent,
   fileContext,
   options: initialOptions,
+  onTaskCreated,
 }) => {
   const plugin = PluginContext.use();
   const settings = useSettingsStore();
@@ -243,6 +248,8 @@ const CreateTaskModalContent: React.FC<CreateTaskProps> = ({
       });
 
       const task = await plugin.services.todoist.actions.createTask(taskContent, params);
+
+      onTaskCreated?.(task);
 
       if (action === "add-copy-app" || action === "add-copy-web") {
         const taskRef = {
@@ -324,7 +331,7 @@ const CreateTaskModalContent: React.FC<CreateTaskProps> = ({
       </div>
       <hr />
       <div className="task-creation-controls">
-        <div>
+        <div className="task-creation-project">
           <ProjectSelector selected={project} setSelected={setProject} />
         </div>
         <div className="task-creation-action">

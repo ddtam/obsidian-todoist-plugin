@@ -1,9 +1,10 @@
-import type { Point } from "obsidian";
-import { Menu } from "obsidian";
+import { Menu, Notice, type Point } from "obsidian";
 
 import type { Task } from "@/data/task";
 import { t } from "@/i18n";
 import type TodoistPlugin from "@/index";
+import { today } from "@/infra/time";
+import { TaskReferencesModal } from "@/ui/taskReferencesModal";
 
 type TaskContext = {
   task: Task;
@@ -17,7 +18,7 @@ export function showTaskContext(ctx: TaskContext, position: Point) {
   const i18n = t().query.contextMenu;
   const isCompleted = ctx.task.completedAt !== undefined;
 
-  new Menu()
+  const menu = new Menu()
     .addItem((menuItem) =>
       menuItem
         .setTitle(isCompleted ? i18n.reopenTaskLabel : i18n.completeTaskLabel)
@@ -40,6 +41,37 @@ export function showTaskContext(ctx: TaskContext, position: Point) {
             task: ctx.task,
             onAfterSave: ctx.onAfterToggle,
           });
+        }),
+    );
+
+  if (!isCompleted) {
+    menu.addItem((menuItem) =>
+      menuItem
+        .setTitle(i18n.setDueTodayLabel)
+        .setIcon("calendar-check")
+        .onClick(async () => {
+          try {
+            await ctx.plugin.services.todoist.actions.updateTask(ctx.task.id, {
+              dueDate: today().toString(),
+            });
+            new Notice(i18n.setDueTodaySuccessNotice);
+          } catch (error: unknown) {
+            console.error("Failed to set due date to today", error);
+            new Notice(i18n.setDueTodayErrorNotice);
+            return;
+          }
+          ctx.onAfterToggle?.();
+        }),
+    );
+  }
+
+  menu
+    .addItem((menuItem) =>
+      menuItem
+        .setTitle(i18n.findReferencesLabel)
+        .setIcon("search")
+        .onClick(() => {
+          new TaskReferencesModal(ctx.plugin, ctx.task.id).open();
         }),
     )
     .addItem((menuItem) =>

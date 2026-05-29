@@ -2,6 +2,7 @@ import type { Command as ObsidianCommand } from "obsidian";
 
 import {
   addTask,
+  addTaskAndInsertRef,
   addTaskWithPageInContent,
   addTaskWithPageInDescription,
 } from "@/commands/addTask";
@@ -31,6 +32,7 @@ const commands = {
   "add-task": addTask,
   "add-task-page-content": addTaskWithPageInContent,
   "add-task-page-description": addTaskWithPageInDescription,
+  "add-task-insert-ref": addTaskAndInsertRef,
   "insert-task-ref": insertTaskRef,
 };
 

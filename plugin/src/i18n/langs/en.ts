@@ -262,8 +262,16 @@ export const en: Translations = {
       completeTaskLabel: "Complete task",
       reopenTaskLabel: "Reopen task",
       editTaskLabel: "Edit task…",
+      setDueTodayLabel: "Set due today",
+      setDueTodaySuccessNotice: "Due date set to today",
+      setDueTodayErrorNotice: "Failed to set due date",
+      findReferencesLabel: "Find references in vault",
       openTaskInAppLabel: "Open task in Todoist (app)",
       openTaskInBrowserLabel: "Open task in Todoist (web)",
+    },
+    referencesModal: {
+      placeholder: "Search notes referencing this task...",
+      emptyState: "No references to this task found in your vault.",
     },
     failedCloseMessage: "Failed to close task",
     header: {
@@ -293,6 +301,7 @@ export const en: Translations = {
     addTask: "Add task",
     addTaskPageContent: "Add task with current page in task content",
     addTaskPageDescription: "Add task with current page in task description",
+    addTaskInsertRef: "Add task and insert reference",
     insertTaskRef: "Insert Todoist task reference",
     insertTaskRefNoEditorNotice: "Open a markdown editor before inserting a task reference.",
     insertTaskRefModal: {
