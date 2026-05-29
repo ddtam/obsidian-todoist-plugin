@@ -145,6 +145,43 @@ describe("TodoistAdapter", () => {
       expect(refreshed?.completedAt).toBeDefined();
     });
 
+    it("also drops the seen-cache entry on close when the task lives in both caches", async () => {
+      // Reproduces the badge "click circle but nothing happens" bug: the
+      // badge seeds seenTasks via a cold-start API fetch (sync hasn't
+      // delivered the task yet), then a later sync populates the active
+      // cache too. Without dropping seen on close, the next getTask serves
+      // the stale uncompleted seen snapshot and the badge looks unchanged.
+      const liveTask = makeApiTask({ id: "t1", content: "before" });
+      const completedTask = makeApiTask({
+        id: "t1",
+        content: "before",
+        checked: true,
+        completedAt: "2026-05-15T00:00:00Z",
+      });
+
+      // Initial sync delivers nothing → active cache is empty for t1.
+      vi.mocked(mockApi.sync)
+        .mockResolvedValueOnce(makeSyncResponse({ items: [] }))
+        .mockResolvedValueOnce(makeSyncResponse({ items: [liveTask] }));
+      // Cold-start badge fetch returns the live task → recorded in seen.
+      // Post-close fetch returns the completed task.
+      vi.mocked(mockApi.getTaskById)
+        .mockResolvedValueOnce(liveTask)
+        .mockResolvedValueOnce(completedTask);
+
+      await adapter.initialize(mockApi);
+      // Badge cold-fetch: API path, seeds seen.
+      await adapter.actions.getTask("t1");
+      // Subsequent sync delivers t1 → now in BOTH active and seen.
+      await adapter.sync();
+
+      await adapter.actions.closeTask("t1");
+
+      // Refresh must round-trip to the API and surface completed state.
+      const refreshed = await adapter.actions.getTask("t1");
+      expect(refreshed?.completedAt).toBeDefined();
+    });
+
     it("drops the seen-cache entry on reopen so the next getTask hits the API", async () => {
       vi.mocked(mockApi.getTaskById)
         .mockResolvedValueOnce(

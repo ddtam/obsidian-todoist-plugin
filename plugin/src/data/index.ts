@@ -253,9 +253,14 @@ export class TodoistAdapter {
   // surface (typically completed). If neither knows about it, do nothing —
   // we don't speculatively promote unrelated tasks into the active set.
   private applyTaskUpdate(id: TaskId, apiTask: ApiTask): void {
+    // A task can be in BOTH caches at once (cold-start fetch lands in seen,
+    // then a later sync also lands it in active). Update wherever it lives
+    // so a subsequent active-cache eviction (e.g. closeTask) doesn't expose
+    // a stale seen entry.
     if (this.tasks.byId(id) !== undefined) {
       this.tasks.applyDiff([apiTask]);
-    } else if (this.seenTasks.byId(id) !== undefined) {
+    }
+    if (this.seenTasks.byId(id) !== undefined) {
       this.seenTasks.record(apiTask);
     }
   }
@@ -270,9 +275,12 @@ export class TodoistAdapter {
     try {
       await this.api.withInner((api) => api.closeTask(id));
       this.tasksPendingClose.remove(id);
-      // Drop the stale active-cache entry so a badge refresh for this id
-      // falls through to the API and picks up the completed state.
+      // Drop the stale entries from BOTH caches so a badge refresh for this
+      // id falls through to the API and picks up the completed state. The
+      // seen cache can hold a pre-completion snapshot from a cold-start API
+      // fetch; without this it would shadow the API on the next read.
       this.tasks.remove(id);
+      this.seenTasks.remove(id);
 
       for (const subscription of this.subscriptions.list()) {
         subscription.remove(id);
