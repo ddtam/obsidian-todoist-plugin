@@ -65,23 +65,52 @@ export default class TodoistPlugin extends Plugin {
     );
   }
 
+  // Per-device cache file keeps multi-device sync tools (e.g. self-hosted
+  // LiveSync) from merge-conflicting the cache: each device only writes its
+  // own file. The device id lives in localStorage, which is per-installation
+  // and not synced across devices.
+  private cacheDir(): string {
+    return this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
+  }
+
+  private deviceId(): string {
+    const key = "todoist-sync-device-id";
+    let id = window.localStorage.getItem(key);
+    if (id === null || id === "") {
+      id = generateDeviceId();
+      window.localStorage.setItem(key, id);
+    }
+    return id;
+  }
+
   private cacheFilePath(): string {
-    const dir = this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
-    return `${dir}/cache.json`;
+    return `${this.cacheDir()}/cache-${this.deviceId()}.json`;
+  }
+
+  private legacyCacheFilePath(): string {
+    return `${this.cacheDir()}/cache.json`;
   }
 
   private async loadCacheFromDisk(): Promise<void> {
     const path = this.cacheFilePath();
+    const legacy = this.legacyCacheFilePath();
     try {
-      const exists = await this.app.vault.adapter.exists(path);
-      if (!exists) {
+      let raw: string | null = null;
+      if (await this.app.vault.adapter.exists(path)) {
+        raw = await this.app.vault.adapter.read(path);
+      } else if (await this.app.vault.adapter.exists(legacy)) {
+        // One-time migration on this device: seed from the legacy shared
+        // cache file. We don't delete it — other devices may still be on
+        // pre-migration code and writing to it.
+        raw = await this.app.vault.adapter.read(legacy);
+      }
+      if (raw === null) {
         return;
       }
-      const raw = await this.app.vault.adapter.read(path);
       const parsed = cachedSyncSchema.safeParse(JSON.parse(raw));
       if (!parsed.success) {
         debug({
-          msg: "cache.json failed schema validation, starting fresh",
+          msg: "cache file failed schema validation, starting fresh",
           context: parsed.error,
         });
         return;
@@ -168,3 +197,13 @@ export default class TodoistPlugin extends Plugin {
     }
   }
 }
+
+// 12 hex chars (~48 bits) — collision-safe across the handful of devices
+// a personal vault sees, while keeping the cache filename short.
+const DEVICE_ID_LENGTH = 12;
+
+const generateDeviceId = (): string => {
+  // crypto.randomUUID is available in every Obsidian runtime (Electron
+  // desktop and modern mobile WebViews).
+  return crypto.randomUUID().split("-").join("").slice(0, DEVICE_ID_LENGTH);
+};
