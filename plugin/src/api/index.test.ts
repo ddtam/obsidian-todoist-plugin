@@ -265,7 +265,7 @@ describe("TodoistApiClient", () => {
       });
     });
 
-    it("preserves explicit nulls so callers can clear due / deadline", async () => {
+    it("sends dueString='no date' to clear due, and explicit null to clear deadline", async () => {
       const fetcher = makeFetcher();
       fetcher.fetch.mockResolvedValueOnce({
         statusCode: 200,
@@ -273,10 +273,12 @@ describe("TodoistApiClient", () => {
       });
 
       const client = new TodoistApiClient("test-token", fetcher);
-      await client.updateTask("task-1", { due: null, deadlineDate: null });
+      // Todoist v1 rejects {due: null}; "no date" is the documented clear
+      // path for due_string. deadline_date does accept null.
+      await client.updateTask("task-1", { dueString: "no date", deadlineDate: null });
 
       const body = JSON.parse(fetcher.fetch.mock.calls[0][0].body as string);
-      expect(body.due).toBeNull();
+      expect(body.due_string).toBe("no date");
       expect(body.deadline_date).toBeNull();
     });
   });

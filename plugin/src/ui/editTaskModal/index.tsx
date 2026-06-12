@@ -202,7 +202,9 @@ const buildUpdateParams = (args: BuildArgs): UpdateTaskParams => {
 
   if (args.dueTouched) {
     if (args.due === undefined) {
-      params.due = null;
+      // Todoist v1 rejects {due: null} with 400 BAD_REQUEST; the supported
+      // clear path is due_string="no date". Verified live 2026-06-12.
+      params.dueString = "no date";
     } else if (args.due.timeInfo !== undefined) {
       params.dueDatetime = toZoned(
         toCalendarDateTime(args.due.date, args.due.timeInfo.time),
