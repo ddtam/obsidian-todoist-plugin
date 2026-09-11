@@ -86,15 +86,36 @@ export class QueryInjector {
 }
 
 /**
- * Whether a mousedown landed in the margin beside a rendered block.
+ * Whether a mousedown beside a rendered block should be stopped from moving
+ * the cursor onto its line.
  *
- * True only for the Live Preview wrapper itself: in reading mode there is no
- * cursor to place and the wrapper carries no `cm-embed-block` class, and any
- * hit on a descendant is a real interaction with the block's own controls.
- * `classList` rather than Obsidian's `hasClass` so this holds in a plain DOM.
+ * Decided by geometry rather than by which element was hit, because the space
+ * that matters is not part of the block. With a readable line length the text
+ * column is narrower than the editor, and a click out in that empty margin
+ * lands on CodeMirror's own content padding, an element every line shares. The
+ * only thing distinguishing "beside this block" from "beside some paragraph"
+ * is the vertical band the block occupies.
+ *
+ * A hit on a descendant is a real interaction with the block's own controls
+ * and is always allowed through. A hit on the wrapper itself is the inner
+ * padding, which is margin by another name.
  */
-export function isMarginClick(wrapper: HTMLElement, target: EventTarget | null): boolean {
-  return wrapper.classList.contains("cm-embed-block") && target === wrapper;
+export function isMarginClick(
+  wrapper: HTMLElement,
+  target: EventTarget | null,
+  clientY: number,
+): boolean {
+  if (target instanceof Node && target !== wrapper && wrapper.contains(target)) {
+    return false;
+  }
+
+  const rect = wrapper.getBoundingClientRect();
+  // An unrendered or collapsed block occupies no band, so it owns no clicks.
+  if (rect.height === 0) {
+    return false;
+  }
+
+  return clientY >= rect.top && clientY <= rect.bottom;
 }
 
 class ReactRenderer<T extends {}> extends MarkdownRenderChild {
@@ -187,11 +208,28 @@ class ReactRenderer<T extends {}> extends MarkdownRenderChild {
    * in to the source.
    */
   private guardAgainstCursorPlacement(wrapper: HTMLElement): void {
-    this.registerDomEvent(wrapper, "mousedown", (evt: MouseEvent) => {
-      if (isMarginClick(wrapper, evt.target)) {
-        evt.preventDefault();
-      }
-    });
+    // Listening on the wrapper only caught clicks within the text column. The
+    // reported case is a click out beyond it, level with the block, which
+    // never reaches the wrapper at all. The editor root is the nearest
+    // ancestor that receives both.
+    const editor = wrapper.closest<HTMLElement>(".cm-editor");
+    // Reading mode: no editor, so no cursor to place.
+    if (editor === null) {
+      return;
+    }
+
+    // Capture phase, so this runs before CodeMirror's own pointer handling
+    // rather than after it has already decided where the cursor goes.
+    this.registerDomEvent(
+      editor,
+      "mousedown",
+      (evt: MouseEvent) => {
+        if (isMarginClick(wrapper, evt.target, evt.clientY)) {
+          evt.preventDefault();
+        }
+      },
+      { capture: true },
+    );
   }
 
   onunload(): void {
