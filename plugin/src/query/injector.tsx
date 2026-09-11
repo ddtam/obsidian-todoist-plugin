@@ -85,6 +85,18 @@ export class QueryInjector {
   }
 }
 
+/**
+ * Whether a mousedown landed in the margin beside a rendered block.
+ *
+ * True only for the Live Preview wrapper itself: in reading mode there is no
+ * cursor to place and the wrapper carries no `cm-embed-block` class, and any
+ * hit on a descendant is a real interaction with the block's own controls.
+ * `classList` rather than Obsidian's `hasClass` so this holds in a plain DOM.
+ */
+export function isMarginClick(wrapper: HTMLElement, target: EventTarget | null): boolean {
+  return wrapper.classList.contains("cm-embed-block") && target === wrapper;
+}
+
 class ReactRenderer<T extends {}> extends MarkdownRenderChild {
   private readonly plugin: TodoistPlugin;
   private readonly props: T;
@@ -137,10 +149,12 @@ class ReactRenderer<T extends {}> extends MarkdownRenderChild {
   }
 
   onload(): void {
-    if (this.containerEl.parentElement !== null) {
-      this.observer.observe(this.containerEl.parentElement, {
+    const wrapper = this.containerEl.parentElement;
+    if (wrapper !== null) {
+      this.observer.observe(wrapper, {
         childList: true,
       });
+      this.guardAgainstCursorPlacement(wrapper);
     }
 
     const Component = this.component;
@@ -153,6 +167,31 @@ class ReactRenderer<T extends {}> extends MarkdownRenderChild {
         </RenderChildContext.Provider>
       </MarkdownEditButtonContext.Provider>,
     );
+  }
+
+  /**
+   * Stop a click beside the block from dropping it back to source.
+   *
+   * In Live Preview the rendered block is a widget on one CodeMirror line, and
+   * the line is wider than the widget. A click in that margin, to the left or
+   * right of the card, lands on the wrapper rather than on anything of ours,
+   * and CodeMirror answers it by putting the cursor on the line, which swaps
+   * the widget for its source. Leaving and re-entering then remounts the React
+   * root and refetches, so the block flickers and the page jumps under the
+   * reader, for a click that was never asking to edit anything.
+   *
+   * Preventing the default on mousedown is what stops the selection moving;
+   * doing it on click is too late. Only a hit on the wrapper itself is
+   * guarded, so every control, checkbox and text selection inside the block
+   * behaves exactly as before, and the header's edit button is still the way
+   * in to the source.
+   */
+  private guardAgainstCursorPlacement(wrapper: HTMLElement): void {
+    this.registerDomEvent(wrapper, "mousedown", (evt: MouseEvent) => {
+      if (isMarginClick(wrapper, evt.target)) {
+        evt.preventDefault();
+      }
+    });
   }
 
   onunload(): void {
