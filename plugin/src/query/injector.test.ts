@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isMarginClick } from "@/query/injector";
+import { handleMarginMousedown, isMarginClick } from "@/query/injector";
 
 // jsdom gives every element a zero rect, so the band has to be stated.
 const blockAt = (top: number, bottom: number) => {
@@ -42,5 +42,53 @@ describe("isMarginClick", () => {
   it("blocks a click with no target, level with the block", () => {
     const block = blockAt(100, 300);
     expect(isMarginClick(block, null, 200)).toBe(true);
+  });
+});
+
+describe("handleMarginMousedown", () => {
+  const setup = (opts: { inEditor?: boolean } = {}) => {
+    const editor = document.createElement("div");
+    editor.classList.add("cm-editor");
+    const content = editor.appendChild(document.createElement("div"));
+    const block = content.appendChild(document.createElement("div"));
+    block.getBoundingClientRect = () =>
+      ({ top: 100, bottom: 300, height: 200, left: 200, right: 800 }) as DOMRect;
+
+    const target = opts.inEditor === false ? document.createElement("div") : content;
+    const calls = { prevented: 0, stopped: 0 };
+    const evt = {
+      target,
+      clientY: 200,
+      preventDefault: () => {
+        calls.prevented++;
+      },
+      stopPropagation: () => {
+        calls.stopped++;
+      },
+    };
+    return { block, evt, calls };
+  };
+
+  it("stops the event as well as the default action", () => {
+    const { block, evt, calls } = setup();
+    expect(handleMarginMousedown(block, evt)).toBe(true);
+    // stopPropagation is what actually keeps CodeMirror from moving the
+    // cursor; preventDefault alone left the block dropping to source.
+    expect(calls.stopped).toBe(1);
+    expect(calls.prevented).toBe(1);
+  });
+
+  it("ignores a click in another pane", () => {
+    const { block, evt, calls } = setup({ inEditor: false });
+    expect(handleMarginMousedown(block, evt)).toBe(false);
+    expect(calls.stopped).toBe(0);
+  });
+
+  it("ignores a block that is not inside an editor", () => {
+    const { evt, calls } = setup();
+    const orphan = document.createElement("div");
+    orphan.getBoundingClientRect = () => ({ top: 100, bottom: 300, height: 200 }) as DOMRect;
+    expect(handleMarginMousedown(orphan, evt)).toBe(false);
+    expect(calls.stopped).toBe(0);
   });
 });

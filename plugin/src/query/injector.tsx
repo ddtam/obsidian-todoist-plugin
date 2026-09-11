@@ -100,6 +100,43 @@ export class QueryInjector {
  * and is always allowed through. A hit on the wrapper itself is the inner
  * padding, which is margin by another name.
  */
+/**
+ * Refuse a margin click on behalf of `wrapper`, and say whether it did.
+ *
+ * **`stopPropagation` is the load-bearing call, not `preventDefault`.**
+ * CodeMirror does not rely on the browser's native caret placement: its own
+ * mousedown handler works out the position and dispatches a selection change
+ * in JavaScript. Cancelling the default action does nothing to a handler that
+ * has already run, so the event has to be stopped before it reaches one, which
+ * means capture phase from above the editor. Two releases were spent calling
+ * only `preventDefault` and watching the block drop to source anyway.
+ * `preventDefault` stays because it is what suppresses the native caret.
+ */
+export function handleMarginMousedown(
+  wrapper: HTMLElement,
+  evt: Pick<MouseEvent, "target" | "clientY"> & {
+    preventDefault(): void;
+    stopPropagation(): void;
+  },
+): boolean {
+  const editor = wrapper.closest(".cm-editor");
+  // Reading mode, or a container not yet placed in an editor.
+  if (editor === null) {
+    return false;
+  }
+  // Another pane's click, which this block has no business refusing.
+  if (!(evt.target instanceof Node) || !editor.contains(evt.target)) {
+    return false;
+  }
+  if (!isMarginClick(wrapper, evt.target, evt.clientY)) {
+    return false;
+  }
+
+  evt.preventDefault();
+  evt.stopPropagation();
+  return true;
+}
+
 export function isMarginClick(
   wrapper: HTMLElement,
   target: EventTarget | null,
@@ -208,25 +245,15 @@ class ReactRenderer<T extends {}> extends MarkdownRenderChild {
    * in to the source.
    */
   private guardAgainstCursorPlacement(wrapper: HTMLElement): void {
-    // Listening on the wrapper only caught clicks within the text column. The
-    // reported case is a click out beyond it, level with the block, which
-    // never reaches the wrapper at all. The editor root is the nearest
-    // ancestor that receives both.
-    const editor = wrapper.closest<HTMLElement>(".cm-editor");
-    // Reading mode: no editor, so no cursor to place.
-    if (editor === null) {
-      return;
-    }
-
-    // Capture phase, so this runs before CodeMirror's own pointer handling
-    // rather than after it has already decided where the cursor goes.
+    // Bound on the document, in capture phase, and the editor is resolved per
+    // event rather than once here: a post-processor can run before its
+    // container is in the editor, so anything resolved at load time may be
+    // null for reasons that have nothing to do with reading mode.
     this.registerDomEvent(
-      editor,
+      document,
       "mousedown",
       (evt: MouseEvent) => {
-        if (isMarginClick(wrapper, evt.target, evt.clientY)) {
-          evt.preventDefault();
-        }
+        handleMarginMousedown(wrapper, evt);
       },
       { capture: true },
     );
