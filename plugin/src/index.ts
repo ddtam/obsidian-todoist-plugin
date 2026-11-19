@@ -7,6 +7,7 @@ import { TodoistApiClient } from "@/api";
 import { ObsidianFetcher } from "@/api/fetcher";
 import { registerCommands } from "@/commands";
 import { cachedSyncSchema } from "@/data/cache";
+import { type CacheStore, indexedDbCacheStore, readCache } from "@/infra/cacheStore";
 import { secondsToMillis } from "@/infra/time";
 import { debug } from "@/log";
 import { QueryInjector } from "@/query/injector";
@@ -20,6 +21,7 @@ const metadataSyncIntervalMs = secondsToMillis(600);
 // biome-ignore lint/style/noDefaultExport: We must use default export for Obsidian plugins
 export default class TodoistPlugin extends Plugin {
   public readonly services: Services;
+  private cacheStore: CacheStore | null = null;
 
   constructor(app: App, pluginManifest: PluginManifest) {
     super(app, pluginManifest);
@@ -65,73 +67,73 @@ export default class TodoistPlugin extends Plugin {
     );
   }
 
-  // Per-device cache file keeps multi-device sync tools (e.g. self-hosted
-  // LiveSync) from merge-conflicting the cache: each device only writes its
-  // own file. The device id lives in localStorage, which is per-installation
-  // and not synced across devices.
+  // The cache lives in IndexedDB, outside the vault; see
+  // infra/cacheStore.ts for why a file in the vault conflicts under
+  // LiveSync. The key is scoped to the vault through app.appId, the id
+  // Obsidian itself uses to scope per-vault storage. It is undocumented, so
+  // the vault name is the fallback.
+  private store(): CacheStore {
+    if (this.cacheStore === null) {
+      const appId = (this.app as unknown as { appId?: string }).appId;
+      const scope = appId ?? this.app.vault.getName();
+      this.cacheStore = indexedDbCacheStore(`cache:${scope}`);
+    }
+    return this.cacheStore;
+  }
+
   private cacheDir(): string {
     return this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
   }
 
-  private deviceId(): string {
-    const key = "todoist-sync-device-id";
-    let id = window.localStorage.getItem(key);
-    if (id === null || id === "") {
-      id = generateDeviceId();
-      window.localStorage.setItem(key, id);
-    }
-    return id;
-  }
-
-  private cacheFilePath(): string {
-    return `${this.cacheDir()}/cache-${this.deviceId()}.json`;
-  }
-
-  private legacyCacheFilePath(): string {
-    return `${this.cacheDir()}/cache.json`;
+  // The device id names the per-device cache file earlier releases wrote.
+  // It is read only to seed IndexedDB once; nothing writes that file now.
+  private legacyFiles() {
+    const adapter = this.app.vault.adapter;
+    const id = window.localStorage.getItem("todoist-sync-device-id");
+    const paths = [
+      ...(id ? [`${this.cacheDir()}/cache-${id}.json`] : []),
+      `${this.cacheDir()}/cache.json`,
+    ];
+    return paths.map((path) => ({
+      exists: () => adapter.exists(path),
+      read: () => adapter.read(path),
+    }));
   }
 
   private async loadCacheFromDisk(): Promise<void> {
-    const path = this.cacheFilePath();
-    const legacy = this.legacyCacheFilePath();
     try {
-      let raw: string | null = null;
-      if (await this.app.vault.adapter.exists(path)) {
-        raw = await this.app.vault.adapter.read(path);
-      } else if (await this.app.vault.adapter.exists(legacy)) {
-        // One-time migration on this device: seed from the legacy shared
-        // cache file. We don't delete it — other devices may still be on
-        // pre-migration code and writing to it.
-        raw = await this.app.vault.adapter.read(legacy);
-      }
-      if (raw === null) {
+      const found = await readCache(this.store(), this.legacyFiles());
+      if (found === null) {
         return;
       }
-      const parsed = cachedSyncSchema.safeParse(JSON.parse(raw));
+      const parsed = cachedSyncSchema.safeParse(JSON.parse(found.raw));
       if (!parsed.success) {
         debug({
-          msg: "cache file failed schema validation, starting fresh",
+          msg: "cache failed schema validation, starting fresh",
           context: parsed.error,
         });
         return;
       }
       this.services.todoist.restoreCache(parsed.data);
       debug({
-        msg: "Restored cache from disk",
-        context: { tasks: parsed.data.tasks.length, savedAt: parsed.data.savedAt },
+        msg: "Restored cache",
+        context: {
+          source: found.source,
+          tasks: parsed.data.tasks.length,
+          savedAt: parsed.data.savedAt,
+        },
       });
     } catch (error) {
-      console.error("Failed to load cache from disk:", error);
+      console.error("Failed to load cache:", error);
     }
   }
 
   private async saveCacheToDisk(): Promise<void> {
-    const path = this.cacheFilePath();
     try {
       const cache = this.services.todoist.dumpCache();
-      await this.app.vault.adapter.write(path, JSON.stringify(cache));
+      await this.store().write(JSON.stringify(cache));
     } catch (error) {
-      console.error("Failed to save cache to disk:", error);
+      console.error("Failed to save cache:", error);
     }
   }
 
@@ -197,13 +199,3 @@ export default class TodoistPlugin extends Plugin {
     }
   }
 }
-
-// 12 hex chars (~48 bits) — collision-safe across the handful of devices
-// a personal vault sees, while keeping the cache filename short.
-const DEVICE_ID_LENGTH = 12;
-
-const generateDeviceId = (): string => {
-  // crypto.randomUUID is available in every Obsidian runtime (Electron
-  // desktop and modern mobile WebViews).
-  return crypto.randomUUID().split("-").join("").slice(0, DEVICE_ID_LENGTH);
-};
